@@ -8,6 +8,8 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-20
+
 ### Added
 
 - **Settings → Clear index** — a control that purges the search index from disk
