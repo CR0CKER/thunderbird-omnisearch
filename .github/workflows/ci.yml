@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # actions/checkout v4 — SHA-pinned per supply-chain policy.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       # Ubuntu runners ship Node preinstalled; `node --check` is the repo's
       # documented syntax gate (there is no build step). No setup-node needed,
       # which keeps the action surface minimal.
@@ -37,7 +37,7 @@ jobs:
     name: Dependency audit (OSV)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       # We ship no lockfile (the one runtime dep is vendored — see lib/VENDOR.md),
       # so a lockfile scanner would find nothing and exit 0 — a false "no vulns".
       # Instead query the OSV database directly for every EXACT pin in
@@ -66,7 +66,7 @@ jobs:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           fetch-depth: 0 # full history so gitleaks scans every commit
       # gitleaks/gitleaks-action v2 — SHA-pinned. Free for personal/public repos.
