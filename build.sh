@@ -20,6 +20,6 @@ zip -r -q -X "$XPI" \
   icons \
   README.md \
   LICENSE \
-  -x "*.DS_Store" "*.map" "icons/omnisearch-128.png"
+  -x "*.DS_Store" "*.map" "icons/omnisearch-128.png" "lib/VENDOR.md"
 
 echo "Built $XPI"

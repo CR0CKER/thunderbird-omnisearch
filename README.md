@@ -1,5 +1,9 @@
 # OmniSearch for Thunderbird
 
+[![CI](https://github.com/CR0CKER/thunderbird-omnisearch/actions/workflows/ci.yml/badge.svg)](https://github.com/CR0CKER/thunderbird-omnisearch/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/CR0CKER/thunderbird-omnisearch)](https://github.com/CR0CKER/thunderbird-omnisearch/releases)
+[![License: MIT](https://img.shields.io/github/license/CR0CKER/thunderbird-omnisearch)](LICENSE)
+
 A fast, forgiving search for your email. Start typing and OmniSearch shows the
 most relevant messages right away — even if you misspell a word or only remember
 part of it.

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Least privilege: the whole workflow only needs to read the repo.
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: JS syntax + JSON validity
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4 — SHA-pinned per supply-chain policy.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      # Ubuntu runners ship Node preinstalled; `node --check` is the repo's
+      # documented syntax gate (there is no build step). No setup-node needed,
+      # which keeps the action surface minimal.
+      - name: node --check every JS file
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            echo "checking $f"
+            node --check "$f"
+          done < <(git ls-files '*.js')
+      - name: Validate JSON manifests
+        run: |
+          set -euo pipefail
+          for j in manifest.json package.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$j','utf8'))" && echo "$j OK"
+          done
+
+  deps:
+    name: Dependency audit (osv-scanner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      # Scans package.json (the pinned, vendored MiniSearch) against the OSV
+      # database. Exits non-zero on any known advisory, failing the gate.
+      # google/osv-scanner-action v2.0.2 — SHA-pinned.
+      - uses: google/osv-scanner-action@e69cc6c86b31f1e7e23935bbe7031b50e51082de
+        with:
+          scan-args: |-
+            --recursive
+            ./
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0 # full history so gitleaks scans every commit
+      # gitleaks/gitleaks-action v2 — SHA-pinned. Free for personal/public repos.
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Tracks the vendored MiniSearch pin in package.json for CVE/security updates.
+  # (The library is committed at lib/minisearch.js — see lib/VENDOR.md — so a
+  # bump PR must also re-vendor the file and update its recorded SHA-256.)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+  # Keeps the SHA-pinned CI actions from drifting behind their upstreams.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore

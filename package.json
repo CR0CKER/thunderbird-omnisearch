@@ -1,0 +1,17 @@
+{
+  "name": "thunderbird-omnisearch",
+  "version": "0.4.3",
+  "description": "Fast, fuzzy, relevance-ranked email search for Thunderbird, powered by MiniSearch.",
+  "private": true,
+  "license": "MIT",
+  "author": "CR0CKER",
+  "homepage": "https://github.com/CR0CKER/thunderbird-omnisearch",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CR0CKER/thunderbird-omnisearch.git"
+  },
+  "//": "This extension ships plain JS with NO build/install step. Its one runtime dependency (MiniSearch) is VENDORED — committed at lib/minisearch.js, loaded via importScripts, never installed from npm. This manifest exists solely to pin the vendored version so GitHub's dependency graph, Dependabot alerts, and osv-scanner track MiniSearch CVEs. See lib/VENDOR.md before bumping.",
+  "dependencies": {
+    "minisearch": "7.2.0"
+  }
+}
