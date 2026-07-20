@@ -15,6 +15,7 @@
   const progressEl = document.getElementById('progress');
   const rebuildBtn = document.getElementById('rebuild');
   const reconcileBtn = document.getElementById('reconcile');
+  const clearBtn = document.getElementById('clear');
   const applyBanner = document.getElementById('applyBanner');
   const applyBannerText = document.getElementById('applyBannerText');
   const applyChangeBtn = document.getElementById('applyChange');
@@ -178,6 +179,7 @@
     progressEl.hidden = !building;
     rebuildBtn.disabled = building;
     reconcileBtn.disabled = building;
+    clearBtn.disabled = building; // don't purge the engine out from under a running build
 
     if (building) {
       progressEl.value = s.progress || 0;
@@ -230,6 +232,30 @@
     statusEl.textContent = 'Verifying against your folders…';
     await send({ type: 'reconcile' });
     void refreshStatus();
+  });
+
+  // Destructive: purges the index from disk. Confirm first, since it also removes
+  // any opted-in decrypted encrypted-mail bodies and leaves search empty until a
+  // rebuild.
+  clearBtn.addEventListener('click', async () => {
+    const ok = confirm(
+      'Clear the search index? This deletes it from disk (including the decrypted ' +
+        'contents of any encrypted emails you opted to index). Search stays empty ' +
+        'until you rebuild.',
+    );
+    if (!ok) return;
+    clearBtn.disabled = true;
+    rebuildBtn.disabled = true;
+    reconcileBtn.disabled = true;
+    statusEl.textContent = 'Clearing the index…';
+    try {
+      await send({ type: 'clear' });
+    } finally {
+      clearBtn.disabled = false;
+      rebuildBtn.disabled = false;
+      reconcileBtn.disabled = false;
+      void refreshStatus();
+    }
   });
 
   applyChangeBtn.addEventListener('click', async () => {

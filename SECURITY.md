@@ -18,9 +18,10 @@ The index contains, per message:
   folder name, the message's RFC `Message-ID`, and a **~200-character preview**
   of the body.
 - **Tokenized into the inverted index**: the full text of `subject`, `from`,
-  `to`, and the body (capped at 20,000 chars). The raw body is *not* stored
-  verbatim, but the inverted index reveals the **set of words** each message
-  contains (and the verbatim preview), which leaks a great deal of content.
+  `to`, and the body (capped by the *Indexed body length* setting — **default
+  4,000 chars**, up to 20,000). The raw body is *not* stored verbatim, but the
+  inverted index reveals the **set of words** each message contains (and the
+  verbatim preview), which leaks a great deal of content.
 
 There is no separate copy of attachments, and no body text beyond the preview is
 stored verbatim.
@@ -72,9 +73,11 @@ encrypted messages show an **"encrypted"** badge.
    header only, with no decrypted plaintext on disk. Only enable *"Index the
    contents of encrypted emails"* if you accept that their decrypted text will
    then be stored unencrypted in the index.
-3. **Removing the add-on** does not guarantee the IndexedDB is wiped immediately;
-   to purge the index, use Settings or clear the extension's storage, or delete
-   the `moz-extension+++<uuid>` storage directory from the profile.
+3. **To purge the index, use Settings → *Clear index***, which deletes it from
+   disk (IndexedDB) — including the decrypted contents of any encrypted emails you
+   opted to index. Note that **removing the add-on** does not guarantee the
+   IndexedDB is wiped immediately; as a belt-and-suspenders measure you can also
+   delete the `moz-extension+++<uuid>` storage directory from the profile.
 
 ## Summary
 

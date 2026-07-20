@@ -42,6 +42,8 @@
       }
       button:hover { background: var(--hover); }
       button:disabled { opacity: 0.5; cursor: default; }
+      button.danger { border-color: #b3261e; color: #b3261e; }
+      button.danger:hover { background: rgba(179, 38, 30, 0.08); }
       .banner {
         display: flex;
         align-items: center;
@@ -141,11 +143,15 @@
     <div class="buttons">
       <button id="rebuild" type="button">Rebuild index</button>
       <button id="reconcile" type="button">Verify &amp; repair</button>
+      <button id="clear" type="button" class="danger">Clear index</button>
     </div>
     <p class="hint">
       <strong>Rebuild</strong> re-indexes all of your mail from scratch.
       <strong>Verify &amp; repair</strong> checks the index against your folders and fixes any drift —
       removing stale entries and indexing anything missing.
+      <strong>Clear index</strong> deletes the search index from disk — including the
+      decrypted contents of any encrypted emails you opted to index. Search stays
+      empty until you rebuild.
     </p>
 
     <script src="options.js"></script>

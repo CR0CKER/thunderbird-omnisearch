@@ -84,6 +84,15 @@
     async reset() {
       engineCount = (await call('reset')).count;
     },
+    async clear() {
+      // Purge RAM + persisted (IndexedDB) index. Refresh every cached field the
+      // status() report reads so the UI immediately shows the empty state.
+      const r = await call('clear');
+      engineCount = r.count;
+      headerOnly = r.headerOnly;
+      updatedAt = r.updatedAt;
+      saveError = r.saveError || null;
+    },
     async flush(meta) {
       const r = await call('flush', meta || {});
       engineCount = r.count;
@@ -216,6 +225,12 @@
       case 'rebuild':
         await ensureLoaded();
         void rebuild();
+        return { type: 'status', status: status() };
+      case 'clear':
+        // Let any in-flight cold load settle first, then purge RAM + disk, so a
+        // load racing the clear can't repopulate the index right after.
+        await ensureLoaded();
+        await engineProxy.clear();
         return { type: 'status', status: status() };
       case 'reconcile':
         await ensureLoaded();
