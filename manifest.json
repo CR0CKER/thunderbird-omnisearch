@@ -23,6 +23,7 @@
       "lib/extract.js",
       "lib/indexer.js",
       "lib/events.js",
+      "lib/open.js",
       "background.js"
     ]
   },

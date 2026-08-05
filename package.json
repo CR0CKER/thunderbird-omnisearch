@@ -3,6 +3,9 @@
   "version": "0.5.1",
   "description": "Fast, fuzzy, relevance-ranked email search for Thunderbird, powered by MiniSearch.",
   "private": true,
+  "scripts": {
+    "test": "node --test 'test/*.test.js'"
+  },
   "license": "MIT",
   "author": "CR0CKER",
   "homepage": "https://github.com/CR0CKER/thunderbird-omnisearch",

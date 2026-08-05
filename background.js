@@ -2,7 +2,8 @@
 // Orchestrator: drives the search engine (which lives in a Web Worker so its
 // heavy JSON + index work never touches the UI thread), applies live updates via
 // the messenger.* APIs, and answers search/command messages from the UI page.
-// Depends on the globals OmniIndexer, OmniEvents (loaded first; see manifest).
+// Depends on the globals OmniIndexer, OmniEvents, OmniOpen (loaded first; see
+// manifest).
 // The worker owns OmniEngine/OmniStore/MiniSearch.
 (function () {
   let loaded = false;
@@ -176,39 +177,9 @@
     await engineProxy.flush({ headerOnly });
   }
 
-  // Open a single message by its numeric id, with a tab fallback.
-  async function tryOpen(id) {
-    if (!Number.isFinite(id)) return false;
-    try {
-      await messenger.messageDisplay.open({ messageId: id, location: 'tab' });
-      return true;
-    } catch (e) {
-      try {
-        const [tab] = await messenger.mailTabs.query({ active: true, currentWindow: true });
-        if (!tab) return false;
-        await messenger.mailTabs.setSelectedMessages(tab.id, [id]);
-        return true;
-      } catch (e2) {
-        return false;
-      }
-    }
-  }
-
-  // Open a result. The stored numeric id can be stale after a restart, so if it
-  // fails we re-resolve the message by its stable RFC Message-ID and open that.
-  async function openMessage(msg) {
-    if (await tryOpen(Number(msg.id))) return;
-    if (msg.headerMessageId) {
-      try {
-        const q = await messenger.messages.query({ headerMessageId: msg.headerMessageId });
-        const list = (q && q.messages) || [];
-        if (list.length && (await tryOpen(list[0].id))) return;
-      } catch (e) {
-        console.error('[OmniSearch] could not re-resolve message:', e);
-      }
-    }
-    console.error('[OmniSearch] could not open message', msg.id, msg.headerMessageId);
-  }
+  // Opening a result lives in lib/open.js (globalThis.OmniOpen) so its
+  // id-resolution logic — the stored numeric id is not stable across restarts —
+  // can be unit-tested without Thunderbird. See test/open.test.js.
 
   // ---- UI message handling ----
   async function handle(msg) {
@@ -237,7 +208,7 @@
         await OmniEvents.reconcile(controller);
         return { type: 'status', status: status() };
       case 'open':
-        await openMessage(msg);
+        await OmniOpen.openMessage(msg);
         return { type: 'ok' };
       default:
         return { type: 'ok' };

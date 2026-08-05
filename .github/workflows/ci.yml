@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      # node:test is built in, and the tests drive lib/ modules with a fake
+      # `messenger` — so there is nothing to install and no action surface added.
+      - name: node --test
+        run: |
+          set -euo pipefail
+          node --test 'test/*.test.js'
+
   syntax:
     name: JS syntax + JSON validity
     runs-on: ubuntu-latest

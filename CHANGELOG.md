@@ -8,6 +8,30 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+### Fixed
+
+- **Search results opened the wrong email.** Clicking a result (or pressing
+  Enter on it) could open a completely unrelated message. The index stored each
+  message's numeric Thunderbird id, but that id is an internal tracking number
+  that is **reissued after every restart** and does not follow a message moved
+  between folders — so a stored id silently came to address a *different* email.
+  Opening it therefore succeeded on the wrong message, and the existing
+  Message-ID fallback never ran because it only triggered when opening *failed*.
+  Results are now resolved by their stable RFC `Message-ID` before opening, with
+  the stored numeric id demoted to a hint that is verified first.
+- Opening a result no longer reports success when the message does not exist:
+  the mail-tab fallback previously returned success unconditionally, masking the
+  failure instead of falling through to re-resolution.
+- A result whose `Message-ID` exists in two accounts now reopens the copy from
+  the account it was indexed from, matching the per-account search dedup.
+
+### Added
+
+- `test/open.test.js` — unit tests covering result-to-message resolution,
+  including a regression test for the wrong-email bug above. Run with
+  `npm test` (or `node --test 'test/*.test.js'`); no dependencies to install.
+- CI now runs the unit tests as a separate `Unit tests` job.
+
 ## [0.5.1] - 2026-07-20
 
 ### Fixed

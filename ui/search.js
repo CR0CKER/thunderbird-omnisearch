@@ -197,7 +197,15 @@
 
       li.append(row, meta, preview);
       li.addEventListener('click', async () => {
-        await send({ type: 'open', id: r.id, headerMessageId: r.headerMessageId });
+        // headerMessageId is the stable identity the background reopens by; the
+        // numeric id is only a hint (it changes across restarts). accountId
+        // disambiguates the same Message-ID appearing in two accounts.
+        await send({
+          type: 'open',
+          id: r.id,
+          headerMessageId: r.headerMessageId,
+          accountId: r.accountId,
+        });
         // Close the popup once the message opens, unless the user opted to keep
         // it open in settings.
         const settings = await getSettings();
