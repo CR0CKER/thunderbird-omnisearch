@@ -8,6 +8,8 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-05
+
 ### Fixed
 
 - **Search results opened the wrong email.** Clicking a result (or pressing
