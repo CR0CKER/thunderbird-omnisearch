@@ -8,6 +8,8 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-06
+
 ### Changed
 
 - **Recent emails now rank higher.** Search ranking previously ignored a
@@ -21,6 +23,21 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   its **subject** still outranks one from today that only mentions it in the
   body.
   **No rebuild is required** — this changes ranking only, not the index.
+
+### Added
+
+- `test/engine.test.js` — unit tests for search-result shaping: the recency
+  curve and its edges (future-dated mail is clamped so it cannot be pushed to
+  the top; a missing date stays neutral), the guarantee that recency does not
+  override the subject/sender weighting, and the existing de-duplication
+  behaviour. Run with `npm test`; no dependencies to install.
+
+### Fixed
+
+- `lib/engine.js` no longer contains a literal NUL byte (it was the internal
+  separator in the de-duplication key, now written as an escape). Git classified
+  the file as binary because of it, which suppressed diffs for the project's
+  most-edited source file. Runtime behaviour is unchanged.
 
 ## [0.5.2] - 2026-08-05
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OmniSearch for Thunderbird",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Fast, fuzzy, relevance-ranked email search powered by MiniSearch. Maintains its own index, independent of Thunderbird's Gloda.",
   "author": "CR0CKER",
   "homepage_url": "https://github.com/CR0CKER/thunderbird-omnisearch",
