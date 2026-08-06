@@ -8,6 +8,19 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+### Changed
+
+- **Recent emails now rank higher.** Search ranking previously ignored a
+  message's date entirely, so equally-good matches came back in an order derived
+  from the folder-walk of the last index build — which meant new mail often sat
+  below old mail for no visible reason. Results are now multiplied by a recency
+  factor that decays with age (1.6× for today's mail, 1.3× at six months, and
+  effectively nothing past a few years), and exact ties are broken by date
+  instead of index order. The boost is capped below the subject-match weighting
+  on purpose: a years-old email with your search term in its **subject** still
+  outranks one from today that only mentions it in the body.
+  **No rebuild is required** — this changes ranking only, not the index.
+
 ## [0.5.2] - 2026-08-05
 
 ### Fixed
