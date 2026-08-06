@@ -328,3 +328,70 @@ test('hasFilters reflects whether any filter is active', () => {
   assert.equal(OmniQuery.hasFilters(parse('from:alice').filters), true);
   assert.equal(OmniQuery.hasFilters(parse('after:party').filters), false);
 });
+
+// ---------------------------------------------------------------------------
+// Multi-word date values without quotes
+//
+// Regression: `date:7 july 2024` silently produced NO filter. The tokenizer
+// split on the spaces, `date:7` was treated as "still being typed" and dropped
+// in silence, and `july 2024` fell through as free text — so the search ran
+// unfiltered and returned 2026 mail whose subject merely contained "July".
+// That is the exact silent-wrongness the reject-rather-than-guess rule exists
+// to prevent, arrived at from the other direction. Quoting is no longer
+// required, and a value that cannot be resolved is never dropped in silence.
+// ---------------------------------------------------------------------------
+
+test('an unquoted multi-word date is parsed, not split into free text', () => {
+  const quoted = parse('date:"7 July 2024"');
+  const bare = parse('date:7 july 2024');
+  assert.equal(bare.filters.after, quoted.filters.after);
+  assert.equal(bare.filters.before, quoted.filters.before);
+  assert.equal(bare.text, '', 'the date words must not leak into the search text');
+  assert.equal(bare.errors.length, 0);
+});
+
+test('an unquoted month-and-year value is parsed', () => {
+  const r = parse('date:july 2024');
+  assert.equal(r.filters.after, startOf(2024, 7));
+  assert.equal(r.filters.before, endOfMonth(2024, 7));
+  assert.equal(r.text, '');
+});
+
+test('a multi-word date combines with free text on either side', () => {
+  const r = parse('invoice date:7 july 2024 receipt');
+  assert.equal(r.filters.after, startOf(2024, 7, 7));
+  assert.equal(r.text, 'invoice receipt');
+});
+
+test('after:/before: also accept unquoted multi-word values', () => {
+  const r = parse('after:june 2024 before:july 2024');
+  assert.equal(r.filters.after, startOf(2024, 6));
+  assert.equal(r.filters.before, endOfMonth(2024, 7));
+  assert.equal(r.text, '');
+});
+
+test('greedy consumption stops at the shortest value that actually parses', () => {
+  // "2024 budget report" is not a date; only "2024" is. The other words must
+  // stay searchable rather than being swallowed by the operator.
+  const r = parse('date:2024 budget report');
+  assert.equal(r.filters.after, startOf(2024));
+  assert.equal(r.text, 'budget report');
+});
+
+test('an unresolvable date value is reported, never silently dropped', () => {
+  // The regression's root cause: `date:7` followed by more words used to vanish
+  // in silence. If it cannot be resolved and the user has clearly moved on, say so.
+  const r = parse('date:7 something else');
+  assert.equal(r.filters.after, null);
+  assert.equal(r.errors.length, 1, 'must not fail silently');
+});
+
+test('a trailing incomplete value stays silent — the user is still typing it', () => {
+  // The distinction that keeps the field usable: an incomplete value at the END
+  // of the query is mid-typing, not a mistake.
+  for (const q of ['date:2', 'date:2024-', 'invoice date:20']) {
+    const r = parse(q);
+    assert.equal(r.errors.length, 0, `${q} should stay quiet`);
+    assert.equal(r.filters.after, null);
+  }
+});

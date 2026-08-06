@@ -50,11 +50,15 @@ One rule covers all of it: **a date means the whole period you named**, and
 `after:2024-06 before:2024-07` is June and July — you never have to name a month
 you don't want.
 
-Write dates **year first** (`2024-06-07`), or spell the month (`"7 June 2024"`,
-also German, French and Spanish). A date like `7/6/2024` is refused rather than
-guessed at, because it means 7 June in Europe and 6 July in the US, and a search
-gives you no hint that it picked the wrong month — you would simply get the wrong
-mail and never know.
+Write dates **year first** (`2024-06-07`), or spell the month — `date:7 july 2024`
+and `date:july 2024` both work, no quotes needed, in English, German, French and
+Spanish.
+
+A date like `7/6/2024` is refused rather than guessed at, because it means 7 June
+in Europe and 6 July in the US, and a search gives you no hint that it picked the
+wrong month — you would simply get the wrong mail and never know. Anything the
+filter can't understand is reported in the results area, so a filter is never
+dropped silently.
 
 **Cleaner results**
 
