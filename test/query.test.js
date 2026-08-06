@@ -434,3 +434,62 @@ test('every rejection teaches the same year-first rule', () => {
     assert.match(parse(q).errors[0], /year first/i, q);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Month-name-first dates, and the last silent hole
+//
+// Regression: `after:july 7 2024` produced NO filter. Only day-before-month was
+// accepted, so `after:july` was not date-shaped, fell through to free text, and
+// the whole query ran as a text search returning mail from 2015 and 2022. The
+// "never drop a filter silently" guard added earlier only covered values that
+// were *incomplete*, not values that failed to look like dates at all.
+// ---------------------------------------------------------------------------
+
+test('month-name-first dates are accepted, in either word order', () => {
+  const dayFirst = parse('date:7 july 2024');
+  for (const q of ['date:july 7 2024', 'date:July 7, 2024', 'date:jul 7 2024']) {
+    const r = parse(q);
+    assert.equal(r.filters.after, dayFirst.filters.after, q);
+    assert.equal(r.filters.before, dayFirst.filters.before, q);
+    assert.equal(r.text, '', `${q} must not leak words into the search text`);
+  }
+});
+
+test('after: accepts a month-name-first date — the reported case', () => {
+  const r = parse('after:july 7 2024');
+  assert.equal(r.filters.after, startOf(2024, 7, 7));
+  assert.equal(r.filters.before, null);
+  assert.equal(r.text, '');
+  assert.equal(r.errors.length, 0);
+});
+
+test('a month name alone is reported rather than searched as text', () => {
+  // `after:july` cannot resolve — no year. Previously it silently became free
+  // text and the search ran unfiltered, which is indistinguishable from success.
+  const r = parse('after:july nonsense here');
+  assert.equal(r.filters.after, null);
+  assert.equal(r.errors.length, 1, 'must not fail silently');
+});
+
+test('a trailing month name stays silent — still being typed', () => {
+  const r = parse('after:july');
+  assert.equal(r.errors.length, 0);
+  assert.equal(r.filters.after, null);
+});
+
+test('a non-date value after a date operator is still ordinary text', () => {
+  // The discrimination that keeps `after:party` searchable: "party" is not a
+  // month name and does not start with a digit, so it is not date-shaped.
+  for (const q of ['after:party', 'before:noon tomorrow please']) {
+    const r = parse(q);
+    assert.equal(r.errors.length, 0, q);
+    assert.match(r.text, /party|noon/, q);
+  }
+});
+
+test('month-name-first works in the other supported languages', () => {
+  const july = parse('date:2024-07-07').filters.after;
+  for (const q of ['date:juli 7 2024', 'date:juillet 7 2024', 'date:julio 7 2024']) {
+    assert.equal(parse(q).filters.after, july, q);
+  }
+});

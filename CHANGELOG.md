@@ -23,8 +23,9 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
     like `<bob@example.net>` was hard to find by name because of how addresses
     are split into words; both are fixed by these filters.
   - Dates must be written **year first** (`2024-06-07`) or with the month spelled
-    out — `date:7 july 2024` and `date:july 2024` both work without quotes, in
-    English, German, French and Spanish. An ambiguous form
+    out in whatever order comes naturally — `date:7 july 2024`,
+    `date:july 7 2024`, `date:July 7, 2024` and `date:july 2024` all work
+    without quotes, in English, German, French and Spanish. An ambiguous form
     like `7/6/2024` is refused with an explanation rather than guessed at: it
     means 7 June in Europe and 6 July in the US, and search results give no hint
     that the wrong month was chosen.

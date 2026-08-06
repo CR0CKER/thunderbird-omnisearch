@@ -50,8 +50,9 @@ One rule covers all of it: **a date means the whole period you named**, and
 `after:2024-06 before:2024-07` is June and July — you never have to name a month
 you don't want.
 
-Write dates **year first** (`2024-06-07`), or spell the month — `date:7 july 2024`
-and `date:july 2024` both work, no quotes needed, in English, German, French and
+Write dates **year first** (`2024-06-07`), or spell the month in whatever order
+comes naturally — `date:7 july 2024`, `date:july 7 2024`, `date:July 7, 2024` and
+`date:july 2024` all work, no quotes needed, in English, German, French and
 Spanish.
 
 A date like `7/6/2024` is refused rather than guessed at, because it means 7 June
