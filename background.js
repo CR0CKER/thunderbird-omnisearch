@@ -67,8 +67,11 @@
   // Async stand-in for the old in-process SearchEngine. fullBuild/events talk to
   // this; each method updates the cached count from the worker's reply.
   const engineProxy = {
+    // Returns the engine's full { results, errors, filters } reply, not just the
+    // hits: a rejected date operator has to reach the UI, or an unparseable
+    // query silently runs unfiltered and looks like it worked.
     async search(query, limit) {
-      return (await call('search', { query, limit })).results;
+      return await call('search', { query, limit });
     },
     async addAll(docs) {
       engineCount = (await call('addAll', { docs })).count;
@@ -186,7 +189,10 @@
     switch (msg.type) {
       case 'search':
         await ensureLoaded();
-        return { type: 'results', results: await engineProxy.search(msg.query, msg.limit || 100) };
+        {
+          const r = await engineProxy.search(msg.query, msg.limit || 100);
+          return { type: 'results', results: r.results, errors: r.errors || [], filters: r.filters || null };
+        }
       case 'status':
         // Reply immediately (don't await the load): status() reports 'loading'
         // until the index is ready, so the popup keeps getting replies during a

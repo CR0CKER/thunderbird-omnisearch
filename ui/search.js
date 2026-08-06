@@ -137,12 +137,37 @@
     }
   }
 
-  function renderResults(results, query) {
+  // Describe the active date/sender filters in the user's own terms, so a
+  // zero-result search reads as "nothing matched in that window" rather than
+  // looking like the search is broken.
+  function describeFilters(filters) {
+    if (!filters) return '';
+    const parts = [];
+    if (filters.from) parts.push(`from ${filters.from}`);
+    if (filters.to) parts.push(`to ${filters.to}`);
+    const d = (ms) => new Date(ms).toLocaleDateString();
+    if (filters.after != null && filters.before != null) parts.push(`between ${d(filters.after)} and ${d(filters.before)}`);
+    else if (filters.after != null) parts.push(`on or after ${d(filters.after)}`);
+    else if (filters.before != null) parts.push(`on or before ${d(filters.before)}`);
+    return parts.join(', ');
+  }
+
+  function renderResults(results, query, errors, filters) {
     resultsEl.replaceChildren();
     emptyEl.textContent = '';
-    if (!query.trim()) return;
+
+    // A rejected date operator MUST be shown. Dropping it silently would run an
+    // unfiltered search that looks like it worked — exactly the failure the
+    // parser's reject-rather-than-guess rule exists to prevent.
+    if (errors && errors.length) {
+      emptyEl.textContent = errors.join(' ');
+      return;
+    }
+
+    const scope = describeFilters(filters);
+    if (!query.trim() && !scope) return;
     if (results.length === 0) {
-      emptyEl.textContent = 'No matches.';
+      emptyEl.textContent = scope ? `No matches ${scope}.` : 'No matches.';
       return;
     }
     for (const r of results) {
@@ -232,7 +257,7 @@
       return;
     }
     if (seq !== searchSeq) return; // a newer keystroke superseded this one
-    if (reply && reply.type === 'results') renderResults(reply.results, query);
+    if (reply && reply.type === 'results') renderResults(reply.results, query, reply.errors, reply.filters);
     else emptyEl.textContent = 'No response from the index.';
   }
 

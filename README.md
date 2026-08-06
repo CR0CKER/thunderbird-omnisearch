@@ -29,6 +29,33 @@ quietly go missing from search.
 - Searches as you type, matching partial words ("invo" finds "invoice").
 - Searches mail that Thunderbird's own search misses.
 
+**Narrow a search by date or sender**
+
+Add filters to any search, or use them on their own:
+
+```
+invoice from:alice@corp.com date:2024-06..2024-07
+```
+
+| Filter | What it does |
+|---|---|
+| `date:2024-06` | Just that month. `date:2024` is the whole year, `date:2024-06-15` that one day. |
+| `date:2024-06..2024-07` | June **and** July, inclusive at both ends. |
+| `after:2024-06` | From 1 June onwards. |
+| `before:2024-06` | Up to and including 30 June. |
+| `from:alice` / `to:bob` | Matches the sender or recipient only — not the message body. |
+
+One rule covers all of it: **a date means the whole period you named**, and
+`after:` starts at its beginning while `before:` runs to its end. So
+`after:2024-06 before:2024-07` is June and July — you never have to name a month
+you don't want.
+
+Write dates **year first** (`2024-06-07`), or spell the month (`"7 June 2024"`,
+also German, French and Spanish). A date like `7/6/2024` is refused rather than
+guessed at, because it means 7 June in Europe and 6 July in the US, and a search
+gives you no hint that it picked the wrong month — you would simply get the wrong
+mail and never know.
+
 **Cleaner results**
 
 - Ignores quoted replies when indexing, so a long back-and-forth thread does not

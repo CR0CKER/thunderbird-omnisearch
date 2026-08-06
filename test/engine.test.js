@@ -29,7 +29,7 @@ const LIB = path.join(__dirname, '..', 'lib');
 function loadOmniEngine() {
   const sandbox = { console };
   vm.createContext(sandbox);
-  for (const file of ['minisearch.js', 'engine.js']) {
+  for (const file of ['minisearch.js', 'query.js', 'engine.js']) {
     const full = path.join(LIB, file);
     vm.runInContext(fs.readFileSync(full, 'utf8'), sandbox, { filename: full });
   }
@@ -153,7 +153,7 @@ test('search: with identical text, the newer message ranks first', () => {
     doc({ id: 'mid', headerMessageId: '<mid@x>', subject: 'quarterly budget', date: NOW - days(180) }),
     doc({ id: 'new', headerMessageId: '<new@x>', subject: 'quarterly budget', date: NOW - days(2) }),
   ]);
-  const found = ids(engine.search('budget', 100, { now: NOW }));
+  const found = ids(engine.search('budget', 100, { now: NOW }).results);
   assert.deepEqual(found, ['new', 'mid', 'old']);
 });
 
@@ -168,17 +168,17 @@ test('search: recency does NOT overrule the subject field boost', () => {
     doc({ id: 'old-subject', headerMessageId: '<a@x>', subject: 'invoice attached', date: NOW - days(1100) }),
     doc({ id: 'new-body', headerMessageId: '<b@x>', subject: 'hello', body: 'invoice attached', date: NOW }),
   ]);
-  const found = ids(engine.search('invoice', 100, { now: NOW }));
+  const found = ids(engine.search('invoice', 100, { now: NOW }).results);
   assert.deepEqual(found, ['old-subject', 'new-body']);
 });
 
 test('search: the boost is a multiplier on the text score, not a replacement', () => {
   const docs = [doc({ id: 'a', subject: 'quarterly budget', date: NOW - days(90) })];
-  const withBoost = engineWith(docs).search('budget', 100, { now: NOW })[0];
+  const withBoost = engineWith(docs).search('budget', 100, { now: NOW }).results[0];
   const noBoost = engineWith(docs).search('budget', 100, {
     now: NOW,
     recency: { strength: 0, halfLifeDays: HALF_LIFE_DAYS },
-  })[0];
+  }).results[0];
   const expected = noBoost.score * OmniEngine.recencyFactor(NOW - days(90), NOW);
   assert.ok(Math.abs(withBoost.score - expected) < 1e-12, `${withBoost.score} != ${expected}`);
 });
@@ -194,7 +194,7 @@ test('search: exact score ties break on date, not on index insertion order', () 
     doc({ id: 'newer', headerMessageId: '<d@x>', subject: 'standup notes', date: NOW - days(1) }),
   ]);
   const off = { strength: 0, halfLifeDays: HALF_LIFE_DAYS };
-  const results = engine.search('standup', 100, { now: NOW, recency: off });
+  const results = engine.search('standup', 100, { now: NOW, recency: off }).results;
   assert.equal(results[0].score, results[1].score, 'precondition: the scores must actually tie');
   assert.deepEqual(ids(results), ['newer', 'older']);
 });
@@ -208,7 +208,7 @@ test('search: the limit is applied AFTER the recency re-sort', () => {
     doc({ id: 'mid', headerMessageId: '<f@x>', subject: 'release plan', date: NOW - days(400) }),
     doc({ id: 'new', headerMessageId: '<g@x>', subject: 'release plan', date: NOW - days(1) }),
   ]);
-  const found = ids(engine.search('release', 2, { now: NOW }));
+  const found = ids(engine.search('release', 2, { now: NOW }).results);
   assert.deepEqual(found, ['new', 'mid']);
 });
 
@@ -222,7 +222,7 @@ test('search: label copies still collapse into one result with merged folders', 
     doc({ id: '1', headerMessageId: '<same@x>', subject: 'travel receipt', folderName: 'All Mail' }),
     doc({ id: '2', headerMessageId: '<same@x>', subject: 'travel receipt', folderName: 'Inbox' }),
   ]);
-  const results = engine.search('receipt', 100, { now: NOW });
+  const results = engine.search('receipt', 100, { now: NOW }).results;
   assert.equal(results.length, 1);
   assert.deepEqual(Array.from(results[0].folders).sort(), ['All Mail', 'Inbox']);
 });
@@ -232,7 +232,7 @@ test('search: an identical Message-ID in two accounts is NOT merged', () => {
     doc({ id: '1', headerMessageId: '<same@x>', accountId: 'account1', subject: 'travel receipt' }),
     doc({ id: '2', headerMessageId: '<same@x>', accountId: 'account2', subject: 'travel receipt' }),
   ]);
-  assert.equal(engine.search('receipt', 100, { now: NOW }).length, 2);
+  assert.equal(engine.search('receipt', 100, { now: NOW }).results.length, 2);
 });
 
 test('search: messages with no Message-ID never collapse together', () => {
@@ -240,10 +240,145 @@ test('search: messages with no Message-ID never collapse together', () => {
     doc({ id: '1', headerMessageId: '', subject: 'travel receipt' }),
     doc({ id: '2', headerMessageId: '', subject: 'travel receipt' }),
   ]);
-  assert.equal(engine.search('receipt', 100, { now: NOW }).length, 2);
+  assert.equal(engine.search('receipt', 100, { now: NOW }).results.length, 2);
 });
 
 test('search: an empty query returns nothing', () => {
   const engine = engineWith([doc({ subject: 'anything' })]);
-  assert.equal(engine.search('   ', 100, { now: NOW }).length, 0);
+  assert.equal(engine.search('   ', 100, { now: NOW }).results.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Query operators (lib/query.js wired through search())
+//
+// These need the parser, so the sandbox loads lib/query.js too — see
+// loadOmniEngine(). Boundaries are built with the LOCAL Date constructor,
+// matching the parser's semantics.
+// ---------------------------------------------------------------------------
+
+const june2024 = (day = 20) => new Date(2024, 5, day, 12).getTime();
+const july2024 = (day = 4) => new Date(2024, 6, day, 12).getTime();
+const may2024 = (day = 20) => new Date(2024, 4, day, 12).getTime();
+
+function datedDocs() {
+  return [
+    doc({ id: 'may', headerMessageId: '<may@x>', subject: 'quarterly invoice', date: may2024() }),
+    doc({ id: 'jun', headerMessageId: '<jun@x>', subject: 'quarterly invoice', date: june2024() }),
+    doc({ id: 'jul', headerMessageId: '<jul@x>', subject: 'quarterly invoice', date: july2024() }),
+    doc({ id: 'aug', headerMessageId: '<aug@x>', subject: 'quarterly invoice', date: new Date(2024, 7, 3, 12).getTime() }),
+  ];
+}
+
+test('search: a date range restricts results to that window', () => {
+  const engine = engineWith(datedDocs());
+  const found = ids(engine.search('invoice date:2024-06..2024-07', 100, { now: NOW }).results);
+  assert.deepEqual(found.sort(), ['jul', 'jun']);
+});
+
+test('search: after:/before: is equivalent to the range form', () => {
+  const engine = engineWith(datedDocs());
+  const a = ids(engine.search('invoice date:2024-06..2024-07', 100, { now: NOW }).results).sort();
+  const b = ids(engine.search('invoice after:2024-06 before:2024-07', 100, { now: NOW }).results).sort();
+  assert.deepEqual(b, a);
+});
+
+test('search: a filter-only query with no free text still returns mail', () => {
+  // Requires MiniSearch's wildcard path — the normal term search needs terms.
+  const engine = engineWith(datedDocs());
+  const found = ids(engine.search('date:2024-06', 100, { now: NOW }).results);
+  assert.deepEqual(found, ['jun']);
+});
+
+test('search: from: is field-scoped, unlike a bare tokenized term', () => {
+  // The false positive this fixes: searching the bare text corp.example.com
+  // matched a message FROM bob@other.example.net, because MiniSearch's AND means
+  // "all terms appear somewhere in the document" and the RECIPIENT matched.
+  const docs = [
+    doc({ id: 'from-alice', headerMessageId: '<a@x>', subject: 'report', from: 'alice@corp.example.com', to: 'me@corp.example.com' }),
+    doc({ id: 'from-bob', headerMessageId: '<b@x>', subject: 'report', from: 'bob@other.example.net', to: 'me@corp.example.com' }),
+  ];
+  const bare = ids(engineWith(docs).search('report corp.example.com', 100, { now: NOW }).results).sort();
+  assert.deepEqual(bare, ['from-alice', 'from-bob'], 'precondition: the bare term matches both');
+
+  const scoped = ids(engineWith(docs).search('report from:corp.example.com', 100, { now: NOW }).results);
+  assert.deepEqual(scoped, ['from-alice'], 'from: must not match on the recipient');
+});
+
+test('search: from: finds a bare address the tokenizer mangles', () => {
+  // "<bob@other.example.net>" indexes as ["<bob","other","example","net>"], so
+  // the term `bob` only matches via fuzzy at a large score penalty. A substring
+  // filter over the stored header has no such problem.
+  const docs = [doc({ id: 'b', headerMessageId: '<b@x>', subject: 'report', from: '<bob@other.example.net>' })];
+  const found = ids(engineWith(docs).search('report from:bob', 100, { now: NOW }).results);
+  assert.deepEqual(found, ['b']);
+});
+
+test('search: the full target query — sender plus date range', () => {
+  const docs = [
+    doc({ id: 'hit', headerMessageId: '<1@x>', subject: 'invoice', from: 'alice@corp.com', date: june2024() }),
+    doc({ id: 'wrong-date', headerMessageId: '<2@x>', subject: 'invoice', from: 'alice@corp.com', date: may2024() }),
+    doc({ id: 'wrong-sender', headerMessageId: '<3@x>', subject: 'invoice', from: 'bob@corp.com', date: june2024() }),
+  ];
+  const r = engineWith(docs).search('invoice from:alice@corp.com date:2024-06..2024-07', 100, { now: NOW });
+  assert.deepEqual(ids(r.results), ['hit']);
+  assert.equal(r.errors.length, 0);
+});
+
+test('search: a rejected ambiguous date applies NO filter and surfaces the error', () => {
+  // The critical safety property: an unparseable date must never silently
+  // degrade into an unfiltered search that looks like it worked.
+  const engine = engineWith(datedDocs());
+  const r = engine.search('invoice date:7/6/2024', 100, { now: NOW });
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0], /Ambiguous/);
+  assert.equal(r.filters.after, null);
+});
+
+test('search: an explicit date filter damps the recency boost', () => {
+  // Asserted on the score rather than on ordering, because ordering is only a
+  // visible consequence for WIDE ranges — see the next test. The mechanism is
+  // exact: with a date range the score is the raw text score, and without one
+  // it is that score times the recency factor.
+  const date = june2024();
+  const docs = [doc({ id: 'a', headerMessageId: '<1@x>', subject: 'quarterly invoice', date })];
+  const undamped = engineWith(docs).search('invoice', 100, { now: NOW }).results[0];
+  const damped = engineWith(docs).search('invoice date:2024-06', 100, { now: NOW }).results[0];
+  const factor = OmniEngine.recencyFactor(date, NOW);
+  assert.ok(factor > 1, 'precondition: the boost is active for this date');
+  assert.ok(Math.abs(undamped.score - damped.score * factor) < 1e-12, `${undamped.score} vs ${damped.score} * ${factor}`);
+});
+
+test('search: damping visibly reorders only for a wide date range', () => {
+  // Worth pinning because it is counter-intuitive: inside a NARROW range the
+  // recency curve barely varies (June vs July 2024 differ by 1.009x, Dec 2025 vs
+  // Jan 2026 by 1.030x), so damping changes nothing observable there. It is a
+  // wide range — where the curve spans years — that damping actually rescues
+  // from being re-sorted by date.
+  const docs = [
+    doc({ id: 'old-strong', headerMessageId: '<1@x>', subject: 'invoice invoice', date: new Date(2005, 5, 1, 12).getTime() }),
+    doc({ id: 'new-weak', headerMessageId: '<2@x>', subject: 'invoice for the quarterly report attached here', date: new Date(2026, 0, 14, 12).getTime() }),
+  ];
+  const unfiltered = ids(engineWith(docs).search('invoice', 100, { now: NOW }).results);
+  assert.equal(unfiltered[0], 'new-weak', 'without a range, recency leads');
+
+  const wide = ids(engineWith(docs).search('invoice date:2000..2026', 100, { now: NOW }).results);
+  assert.equal(wide[0], 'old-strong', 'with an explicit range, relevance leads');
+});
+
+test('search: filters compose with dedup and the limit', () => {
+  const docs = [
+    doc({ id: '1', headerMessageId: '<same@x>', subject: 'travel receipt', folderName: 'All Mail', date: june2024() }),
+    doc({ id: '2', headerMessageId: '<same@x>', subject: 'travel receipt', folderName: 'Inbox', date: june2024() }),
+    doc({ id: '3', headerMessageId: '<other@x>', subject: 'travel receipt', folderName: 'Inbox', date: may2024() }),
+  ];
+  const r = engineWith(docs).search('receipt date:2024-06', 100, { now: NOW });
+  assert.equal(r.results.length, 1, 'the May message is filtered out and the label copies collapse');
+  assert.deepEqual(Array.from(r.results[0].folders).sort(), ['All Mail', 'Inbox']);
+});
+
+test('search: an empty query with no filters still returns nothing', () => {
+  const engine = engineWith(datedDocs());
+  const r = engine.search('   ', 100, { now: NOW });
+  assert.equal(r.results.length, 0);
+  assert.equal(r.errors.length, 0);
 });

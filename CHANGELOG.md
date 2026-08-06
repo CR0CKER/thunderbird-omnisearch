@@ -8,6 +8,30 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+### Added
+
+- **Search filters for date and sender.** Narrow any search with `date:`,
+  `after:`, `before:`, `from:` and `to:` — for example
+  `invoice from:alice@corp.com date:2024-06..2024-07`. Filters work on their own
+  too, with no search words at all.
+  - A date always means **the whole period you named**: `date:2024-06` is all of
+    June, `after:2024-06` starts at 1 June, and `before:2024-06` runs to the end
+    of 30 June. So `after:2024-06 before:2024-07` is June and July inclusive —
+    unlike Gmail, you never have to name a month you don't want.
+  - `from:`/`to:` match the sender or recipient **only**. Previously a plain
+    search for a domain could match on the recipient instead, and a bare address
+    like `<bob@example.net>` was hard to find by name because of how addresses
+    are split into words; both are fixed by these filters.
+  - Dates must be written **year first** (`2024-06-07`) or with the month spelled
+    out (`"7 June 2024"`, also German, French and Spanish). An ambiguous form
+    like `7/6/2024` is refused with an explanation rather than guessed at: it
+    means 7 June in Europe and 6 July in the US, and search results give no hint
+    that the wrong month was chosen.
+  - Inside an explicit date range, results are ordered by relevance rather than
+    by the recency preference added in 0.6.0 — you already said which period you
+    wanted.
+  - **No rebuild is required.**
+
 ## [0.6.0] - 2026-08-06
 
 ### Changed
