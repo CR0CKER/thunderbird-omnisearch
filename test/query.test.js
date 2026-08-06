@@ -175,21 +175,20 @@ test('day-first slash dates are rejected even when only one reading is possible'
   }
 });
 
-test('every rejected slash form ends with the same guidance sentence', () => {
-  // Originally this asserted the messages were byte-identical. They are not,
-  // and should not be: "7/6/2024" genuinely has two readings and names them
-  // both, whereas 13 cannot be a month, so calling "13/6/2024" ambiguous would
-  // be untrue — it is rejected for consistency and says so. What actually makes
-  // the rule learnable in one encounter is the shared *guidance*, so that is
-  // what is pinned here.
-  const guidance = 'Use YYYY-MM-DD (e.g. 2024-06-07), or write the month name (e.g. "7 June 2024").';
-  for (const value of ['7/6/2024', '13/6/2024', '6/13/2024', '7/6/24']) {
-    assert.ok(parse(`date:${value}`).errors[0].endsWith(guidance), `${value}: ${parse(`date:${value}`).errors[0]}`);
+test('a rejection claims ambiguity only when the readings genuinely differ', () => {
+  // This assertion has been narrowed twice, each time because it claimed more
+  // than was true. It first required byte-identical messages; that was wrong,
+  // because "7/6/2024" has two real readings to name while "13/6/2024" does not
+  // (13 cannot be a month). It then required a shared trailing sentence; that
+  // became wrong too, once messages started suggesting the correction for the
+  // date the user actually typed. The shared *rule* is asserted separately, by
+  // "every rejection teaches the same year-first rule".
+  assert.match(parse('date:7/6/2024').errors[0], /^Ambiguous/, 'two differing readings');
+  for (const value of ['13/6/2024', '6/13/2024', '7/7/2024']) {
+    assert.match(parse(`date:${value}`).errors[0], /^Unsupported/, `${value} has no competing reading`);
   }
-  // The genuinely ambiguous case must still name both readings.
-  assert.match(parse('date:7/6/2024').errors[0], /^Ambiguous/);
-  // The technically-unambiguous-but-rejected case must not claim ambiguity.
-  assert.match(parse('date:13/6/2024').errors[0], /^Unsupported/);
+  // A two-digit year is still ambiguous in the day/month sense.
+  assert.match(parse('date:7/6/24').errors[0], /^Ambiguous/);
 });
 
 test('a complete but out-of-range date is an error, not a silent drop', () => {
@@ -393,5 +392,45 @@ test('a trailing incomplete value stays silent — the user is still typing it',
     const r = parse(q);
     assert.equal(r.errors.length, 0, `${q} should stay quiet`);
     assert.equal(r.filters.after, null);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Rejection messages must be true and actionable
+//
+// Regression: `7/7/2024` produced "7 July 2024 or 7 July 2024?" — the two
+// readings coincide, so there was nothing ambiguous to report. The messages now
+// name only readings that actually differ, and suggest the correction derived
+// from what the user typed rather than a fixed example of another date.
+// ---------------------------------------------------------------------------
+
+test('a slash date whose two readings coincide is not called ambiguous', () => {
+  const r = parse('date:7/7/2024');
+  assert.equal(r.filters.after, null, 'still refused — the year-first rule is uniform');
+  assert.doesNotMatch(r.errors[0], /^Ambiguous/);
+  assert.doesNotMatch(r.errors[0], /(7 July 2024).*\1/, 'must not offer the same reading twice');
+});
+
+test('a rejection suggests the correction for the date the user actually typed', () => {
+  assert.match(parse('date:7/7/2024').errors[0], /2024-07-07/);
+  assert.match(parse('date:13/6/2024').errors[0], /2024-06-13/);
+  assert.match(parse('date:6/13/2024').errors[0], /2024-06-13/);
+  // Genuinely ambiguous: both corrections are offered.
+  const both = parse('date:7/6/2024').errors[0];
+  assert.match(both, /2024-06-07/);
+  assert.match(both, /2024-07-06/);
+});
+
+test('rejection messages do not tell the user to add quotes', () => {
+  // Quoting stopped being necessary, so advising it would send people down the
+  // path that made `date:7 july 2024` fail in the first place.
+  for (const v of ['7/6/2024', '7/7/2024', '13/6/2024']) {
+    assert.doesNotMatch(parse(`date:${v}`).errors[0], /"[0-9]+ [A-Z][a-z]+ [0-9]{4}"/, v);
+  }
+});
+
+test('every rejection teaches the same year-first rule', () => {
+  for (const q of ['date:7/6/2024', 'date:7/7/2024', 'date:13/6/2024', 'date:7 something else']) {
+    assert.match(parse(q).errors[0], /year first/i, q);
   }
 });
