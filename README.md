@@ -20,10 +20,11 @@ quietly go missing from search.
 
 - Ranks the most relevant messages first, and gives extra weight to matches in
   the subject, sender, and recipient over matches deep in the body.
-- Favours recent mail: when two messages match about equally well, the newer one
-  comes first, with the preference fading out over a couple of years. A strong
-  match still wins — a years-old email with your search word in its *subject*
-  stays above one from today that only mentions it in the body.
+- Strongly favours recent mail: of two comparable matches the newer one comes
+  first, and the preference stays noticeable for about a year before fading out.
+  Where you matched still counts for more — a years-old email with your search
+  word in its *subject* stays above one from today that only mentions it in
+  passing in the body.
 - Tolerates typos, so "reciept" still finds "receipt".
 - Searches as you type, matching partial words ("invo" finds "invoice").
 - Searches mail that Thunderbird's own search misses.
