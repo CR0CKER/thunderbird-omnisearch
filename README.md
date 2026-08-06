@@ -76,11 +76,14 @@ keep it open.
 
 ## Installing
 
-There is no build step — the extension is plain JavaScript. To make the
-installable file, run `./build.sh` (it needs the `zip` tool), which produces a
-`.xpi` file. To install it for personal use: in Thunderbird's `about:config`, set
+Download the `.xpi` from the
+[latest release](https://github.com/CR0CKER/thunderbird-omnisearch/releases/latest),
+or build it yourself: there is no build step — the extension is plain JavaScript,
+so `./build.sh` (it needs the `zip` tool) just packages it.
+
+To install it for personal use: in Thunderbird's `about:config`, set
 `xpinstall.signatures.required` to `false`, then install the `.xpi` through
-Add-ons Manager, gear icon, "Install Add-on From File". 
+Add-ons Manager, gear icon, "Install Add-on From File".
 
 After installing, click the magnifier button in the toolbar (or press Alt+S) to
 open search. The first time, it builds the index in the background. The Alt+S
@@ -117,6 +120,7 @@ OmniSearch, gear icon, Options.
 | Indexed body length per email | 4,000 characters | How much of each email's body is searchable. Smaller keeps the index lighter and faster to load; larger makes more of long emails searchable. Changing it needs a rebuild. |
 | Rebuild index | — | Re-indexes all of your mail from scratch. |
 | Verify and repair | — | Checks the index against your folders and fixes any differences. |
+| Clear index | — | Deletes the index from disk, including the decrypted contents of any encrypted mail you opted to index. Search finds nothing until you rebuild. This is the purge referred to in [SECURITY.md](SECURITY.md). |
 
 ### Applying changes without a full rebuild
 
