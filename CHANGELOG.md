@@ -8,6 +8,8 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-07
+
 ### Added
 
 - **Search filters for date and sender.** Narrow any search with `date:`,
@@ -32,7 +34,19 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   - Inside an explicit date range, results are ordered by relevance rather than
     by the recency preference added in 0.6.0 — you already said which period you
     wanted.
+  - A filter is **never dropped in silence.** If part of what you typed can't be
+    understood as a date, it is reported in the results area rather than being
+    ignored, because a search that quietly ran without your filter looks exactly
+    like one that worked.
   - **No rebuild is required.**
+
+### Added (developer)
+
+- `lib/query.js` — the query-operator parser, a pure module with no Thunderbird
+  or MiniSearch dependencies, loaded inside the engine worker.
+- `test/query.test.js` — 49 unit tests for it, including the ambiguous-date
+  rules and a pinned non-UTC timezone (a UTC test runner cannot see the
+  local-vs-UTC parsing bug these guard against). Total suite: 84 tests.
 
 ## [0.6.0] - 2026-08-06
 

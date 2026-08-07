@@ -1,6 +1,6 @@
 {
   "name": "thunderbird-omnisearch",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Fast, fuzzy, relevance-ranked email search for Thunderbird, powered by MiniSearch.",
   "private": true,
   "scripts": {
