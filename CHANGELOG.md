@@ -8,6 +8,17 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+### Added
+
+- **Filter chips.** Each active `date:`/`from:`/`to:` filter now appears as a chip
+  below the search box, labelled with the dates it actually **resolved to**
+  (`1/6/2024 – 31/7/2024`) rather than the text you typed — so a range that came
+  out wider than you meant is visible before it hands you the wrong mail. Click a
+  chip's **×** to drop that filter and search again; the rest of the query,
+  including your search words, is kept.
+- **A hint pointing at the filters**, shown when a search finds nothing — the
+  moment you are most likely to want it. It stays out of the way otherwise.
+
 ## [0.7.0] - 2026-08-07
 
 ### Added

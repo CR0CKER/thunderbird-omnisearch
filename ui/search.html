@@ -35,6 +35,11 @@
     <div id="status" class="status"></div>
     <progress id="progress" max="1" value="0" hidden></progress>
 
+    <!-- Active date/sender filters, one removable chip each. Empty when no
+         filter is active, and .chips:empty collapses so it adds no height to
+         the centered window's opening size. -->
+    <div id="chips" class="chips"></div>
+
     <ul id="results"></ul>
     <div id="empty" class="empty"></div>
 

@@ -6,6 +6,8 @@
   /* Use the platform/theme accent colour, not a hardcoded blue. */
   --accent: AccentColor;
   --hover: #f0f6ff;
+  --chip-bg: #eef1f5;
+  --chip-hover: #dde2e9;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -14,6 +16,8 @@
     --muted: #a8a8b3;
     --border: #38383d;
     --hover: #2a2a33;
+    --chip-bg: #2b2b34;
+    --chip-hover: #3a3a45;
   }
 }
 
@@ -144,8 +148,72 @@ button:hover { background: var(--hover); }
    inflates the centered window's collapsed (field-only) height, which forced an
    open-time resize and clipped the field. They reclaim padding once populated. */
 .status:empty,
-.empty:empty {
+.empty:empty,
+.chips:empty {
   padding: 0;
+}
+
+/* Active filter chips. Each shows the RESOLVED meaning of a filter ("1 Jun –
+   31 Jul 2024"), not the text the user typed, so an off-by-a-month range is
+   visible before it silently returns the wrong mail. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 100%;
+}
+.chip .chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Comfortably clickable without inflating the row's height. */
+.chip .chip-remove {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chip .chip-remove:hover {
+  background: var(--chip-hover);
+  color: var(--fg);
+}
+.chip .chip-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* The filter hint in the empty state — quieter than the message above it. */
+.hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--chip-bg);
+  border-radius: 3px;
+  padding: 1px 4px;
 }
 progress { width: calc(100% - 28px); margin: 0 14px 8px; height: 6px; }
 

@@ -61,6 +61,11 @@ wrong month — you would simply get the wrong mail and never know. Anything the
 filter can't understand is reported in the results area, so a filter is never
 dropped silently.
 
+Each active filter appears as a chip below the search box, showing the dates it
+actually resolved to (`1/6/2024 – 31/7/2024`) rather than what you typed — so a
+range that came out wider than you meant is visible before it hands you the wrong
+mail. Click a chip's **×** to drop that filter and search again.
+
 **Cleaner results**
 
 - Ignores quoted replies when indexing, so a long back-and-forth thread does not

@@ -67,7 +67,7 @@
   // Async stand-in for the old in-process SearchEngine. fullBuild/events talk to
   // this; each method updates the cached count from the worker's reply.
   const engineProxy = {
-    // Returns the engine's full { results, errors, filters } reply, not just the
+    // Returns the engine's full { results, errors, filters, applied } reply, not just the
     // hits: a rejected date operator has to reach the UI, or an unparseable
     // query silently runs unfiltered and looks like it worked.
     async search(query, limit) {
@@ -191,7 +191,14 @@
         await ensureLoaded();
         {
           const r = await engineProxy.search(msg.query, msg.limit || 100);
-          return { type: 'results', results: r.results, errors: r.errors || [], filters: r.filters || null };
+          return {
+            type: 'results',
+            results: r.results,
+            errors: r.errors || [],
+            filters: r.filters || null,
+            applied: r.applied || [],
+            text: r.text || '',
+          };
         }
       case 'status':
         // Reply immediately (don't await the load): status() reports 'loading'

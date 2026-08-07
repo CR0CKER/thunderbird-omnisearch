@@ -493,3 +493,67 @@ test('month-name-first works in the other supported languages', () => {
     assert.equal(parse(q).filters.after, july, q);
   }
 });
+
+// ---------------------------------------------------------------------------
+// `applied` — what the UI needs to render removable filter chips
+//
+// A chip has to be removable, and removing one must not do string surgery on
+// the raw query (a repeated substring would make that ambiguous). So the parser
+// reports the exact source text it consumed per operator; the UI rebuilds the
+// query from the remaining sources plus the leftover free text.
+// ---------------------------------------------------------------------------
+
+test('applied reports the source text consumed by each operator', () => {
+  const r = parse('invoice from:alice date:2024-06');
+  // Array.from re-homes the vm sandbox's array into this realm; assert/strict
+  // otherwise rejects it on prototype identity even when the contents match.
+  const sources = Array.from(r.applied, (a) => a.source).sort();
+  assert.deepEqual(sources, ['date:2024-06', 'from:alice']);
+  assert.equal(r.text, 'invoice');
+});
+
+test('applied captures a multi-word date value in full', () => {
+  // The whole point: "date:7 july 2024" spans three tokens, and dropping the
+  // chip must remove all three, not just the first.
+  const r = parse('invoice date:7 july 2024');
+  assert.equal(r.applied.length, 1);
+  assert.equal(r.applied[0].source, 'date:7 july 2024');
+});
+
+test('rebuilding from applied sources plus text round-trips the filters', () => {
+  const original = 'invoice from:alice date:2024-06..2024-07';
+  const r = parse(original);
+  const rebuilt = [...r.applied.map((a) => a.source), r.text].join(' ');
+  const again = parse(rebuilt);
+  assert.equal(again.filters.after, r.filters.after);
+  assert.equal(again.filters.before, r.filters.before);
+  assert.equal(again.filters.from, r.filters.from);
+  assert.equal(again.text, r.text);
+});
+
+test('dropping one applied entry removes exactly that filter', () => {
+  const r = parse('invoice from:alice date:2024-06');
+  const kept = r.applied.filter((a) => a.op !== 'date');
+  const rebuilt = [...kept.map((a) => a.source), r.text].join(' ');
+  const after = parse(rebuilt);
+  assert.equal(after.filters.after, null, 'the date filter is gone');
+  assert.equal(after.filters.from, 'alice', 'the sender filter survives');
+  assert.equal(after.text, 'invoice');
+});
+
+test('applied carries what each chip needs to label itself', () => {
+  const r = parse('from:alice date:2024-06 before:2024-08');
+  const byOp = Object.fromEntries(r.applied.map((a) => [a.op, a]));
+  assert.equal(byOp.from.value, 'alice');
+  assert.equal(byOp.date.after, startOf(2024, 6));
+  assert.equal(byOp.date.before, endOfMonth(2024, 6));
+  assert.equal(byOp.before.before, endOfMonth(2024, 8));
+  assert.equal(byOp.before.after, null);
+});
+
+test('a rejected or unresolved operator contributes no chip', () => {
+  // A chip claiming a filter that is not actually applied would be a lie.
+  for (const q of ['date:7/6/2024', 'after:party', 'date:2']) {
+    assert.equal(parse(q).applied.length, 0, q);
+  }
+});

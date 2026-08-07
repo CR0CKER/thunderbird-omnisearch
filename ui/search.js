@@ -9,6 +9,7 @@
   const statusEl = $('status');
   const progressEl = $('progress');
   const emptyEl = $('empty');
+  const chipsEl = $('chips');
   const loadingEl = $('loading');
 
   // Launched as the centered standalone window (background opens
@@ -137,6 +138,22 @@
     }
   }
 
+  // One-line pointer at the filter syntax, built from DOM nodes so the examples
+  // can be marked up as code without innerHTML.
+  function filterHint() {
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.append('Tip: narrow a search with ');
+    for (const [i, example] of ['from:alice', 'date:2024-06', 'date:2024-06..2024-07'].entries()) {
+      if (i) hint.append(i === 2 ? ' or ' : ', ');
+      const code = document.createElement('code');
+      code.textContent = example;
+      hint.appendChild(code);
+    }
+    hint.append('.');
+    return hint;
+  }
+
   // Describe the active date/sender filters in the user's own terms, so a
   // zero-result search reads as "nothing matched in that window" rather than
   // looking like the search is broken.
@@ -152,9 +169,64 @@
     return parts.join(', ');
   }
 
-  function renderResults(results, query, errors, filters) {
+  // Label a chip with the RESOLVED meaning of its filter rather than the text
+  // that was typed — "1 Jun 2024 – 31 Jul 2024", not "date:2024-06..2024-07".
+  // A range that came out a month wider than intended is then visible before it
+  // quietly returns the wrong mail.
+  function chipLabel(entry) {
+    if (entry.op === 'from' || entry.op === 'to') return `${entry.op}: ${entry.value}`;
+    const d = (ms) => new Date(ms).toLocaleDateString();
+    if (entry.after != null && entry.before != null) {
+      // A single day resolves to the same date at both ends; say it once.
+      const a = d(entry.after);
+      const b = d(entry.before);
+      return a === b ? a : `${a} – ${b}`;
+    }
+    if (entry.after != null) return `on or after ${d(entry.after)}`;
+    return `on or before ${d(entry.before)}`;
+  }
+
+  // Rebuild the query from the chips the user kept, plus the leftover free
+  // text. Reconstructing beats cutting the removed operator out of the raw
+  // string, which would be ambiguous whenever the same text appears twice.
+  function removeFilter(applied, index, freeText) {
+    const kept = applied.filter((_, i) => i !== index).map((a) => a.source);
+    queryInput.value = [...kept, freeText].join(' ').trim();
+    clearBtn.hidden = queryInput.value.length === 0;
+    queryInput.focus();
+    void runSearch();
+  }
+
+  function renderChips(applied, freeText) {
+    chipsEl.replaceChildren();
+    for (const [index, entry] of (applied || []).entries()) {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+
+      const label = document.createElement('span');
+      label.className = 'chip-label';
+      // textContent, never innerHTML: from:/to: values come from the query but
+      // are echoed back alongside mail-derived content elsewhere in this list.
+      label.textContent = chipLabel(entry);
+      label.title = entry.source; // what was typed, on hover
+
+      const remove = document.createElement('button');
+      remove.className = 'chip-remove';
+      remove.type = 'button';
+      remove.textContent = '×';
+      remove.title = `Remove ${entry.source}`;
+      remove.setAttribute('aria-label', `Remove filter ${chipLabel(entry)}`);
+      remove.addEventListener('click', () => removeFilter(applied, index, freeText));
+
+      chip.append(label, remove);
+      chipsEl.appendChild(chip);
+    }
+  }
+
+  function renderResults(results, query, errors, filters, applied, freeText) {
     resultsEl.replaceChildren();
-    emptyEl.textContent = '';
+    emptyEl.replaceChildren();
+    renderChips(applied, freeText || '');
 
     // A rejected date operator MUST be shown. Dropping it silently would run an
     // unfiltered search that looks like it worked — exactly the failure the
@@ -168,6 +240,11 @@
     if (!query.trim() && !scope) return;
     if (results.length === 0) {
       emptyEl.textContent = scope ? `No matches ${scope}.` : 'No matches.';
+      // The filters are invisible unless something points at them, and a search
+      // that found nothing is when someone is most receptive to learning they
+      // exist. Deliberately NOT shown at rest: an always-present hint would add
+      // height to the centered window's opening size and make it resize on open.
+      emptyEl.appendChild(filterHint());
       return;
     }
     for (const r of results) {
@@ -257,7 +334,9 @@
       return;
     }
     if (seq !== searchSeq) return; // a newer keystroke superseded this one
-    if (reply && reply.type === 'results') renderResults(reply.results, query, reply.errors, reply.filters);
+    if (reply && reply.type === 'results') {
+      renderResults(reply.results, query, reply.errors, reply.filters, reply.applied, reply.text);
+    }
     else emptyEl.textContent = 'No response from the index.';
   }
 
@@ -323,7 +402,10 @@
     queryInput.value = '';
     syncClearButton();
     resultsEl.replaceChildren();
-    emptyEl.textContent = '';
+    emptyEl.replaceChildren();
+    // Chips must go with the query that produced them — a chip left behind
+    // would claim a filter that is no longer being applied.
+    chipsEl.replaceChildren();
     queryInput.focus();
   });
 
