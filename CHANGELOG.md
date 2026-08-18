@@ -8,6 +8,8 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-18
+
 ### Added
 
 - **Filter chips.** Each active `date:`/`from:`/`to:` filter now appears as a chip
@@ -23,6 +25,15 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   `after:`, `before:` — each with an example value, so you can see both that a
   filter exists and what a valid value looks like. Click one to drop it into the
   search box, then type the value. They disappear as soon as you start typing.
+- **Relative and named date filters.** `newer_than:7d` and `older_than:1y` take
+  a number and a unit (`d`, `w`, `m`, `y`); months and years step the calendar,
+  so `3m` respects month lengths rather than assuming 30 days. The two are exact
+  complements — every message falls in one or the other, with no overlap and no
+  gap. Also `date:today`, `date:yesterday`, `date:this-week` (Monday to Sunday),
+  `date:this-month` and `date:this-year`, which are ordinary period values and so
+  compose with the rest: `after:today`, `date:yesterday..today`.
+  Relative windows snap to whole days, so results do not shift under you as the
+  clock ticks.
 
 ### Added (developer)
 
@@ -84,16 +95,6 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
     ignored, because a search that quietly ran without your filter looks exactly
     like one that worked.
   - **No rebuild is required.**
-
-- **Relative and named date filters.** `newer_than:7d` and `older_than:1y` take
-  a number and a unit (`d`, `w`, `m`, `y`); months and years step the calendar,
-  so `3m` respects month lengths rather than assuming 30 days. The two are exact
-  complements — every message falls in one or the other, with no overlap and no
-  gap. Also `date:today`, `date:yesterday`, `date:this-week` (Monday to Sunday),
-  `date:this-month` and `date:this-year`, which are ordinary period values and so
-  compose with the rest: `after:today`, `date:yesterday..today`.
-  Relative windows snap to whole days, so results do not shift under you as the
-  clock ticks.
 
 ### Added (developer)
 
