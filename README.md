@@ -120,7 +120,9 @@ keep it open.
 Download the `.xpi` from the
 [latest release](https://github.com/CR0CKER/thunderbird-omnisearch/releases/latest),
 or build it yourself: there is no build step — the extension is plain JavaScript,
-so `./build.sh` (it needs the `zip` tool) just packages it.
+so `./build.sh` (it needs the `zip` tool) just packages it. That produces a
+development build whose filename records the branch and commit it came from; use
+`./build.sh --release` for a clean `thunderbird-omnisearch-<version>.xpi`.
 
 To install it for personal use: in Thunderbird's `about:config`, set
 `xpinstall.signatures.required` to `false`, then install the `.xpi` through

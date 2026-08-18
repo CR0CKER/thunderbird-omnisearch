@@ -24,6 +24,14 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   filter exists and what a valid value looks like. Click one to drop it into the
   search box, then type the value. They disappear as soon as you start typing.
 
+### Added (developer)
+
+- `./build.sh` now stamps development builds with the branch and commit they came
+  from (`…+master-d613db3.xpi`, plus `-dirty` for uncommitted changes), so a
+  stale `.xpi` is no longer indistinguishable from a fresh one. `./build.sh
+  --release` produces the clean release filename, and the stamp is skipped
+  automatically outside a git checkout.
+
 ### Fixed
 
 - **A taller search window now fills with results.** Dragging the centered search
