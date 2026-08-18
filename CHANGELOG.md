@@ -8,6 +8,30 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ## [Unreleased]
 
+### Fixed
+
+- **New mail stopped reaching the index.** Messages that arrived after the last
+  full rebuild were frequently never indexed, so searching for them returned
+  nothing at all — not a bad ranking, no result. On one real profile 75% of a
+  month's archived mail, 81% of inbox mail and 100% of sent mail was missing.
+  Two causes, both fixed:
+  - Documents were keyed on Thunderbird's numeric message id, which is reissued
+    every session from a low, dense range. After a restart nearly every live id
+    already existed in the index pointing at a *different* message, so
+    "Verify & repair" concluded the missing mail was already indexed and skipped
+    it. Documents are now keyed on account + RFC Message-ID, which does not
+    change between sessions, so the repair works and re-indexing a message can no
+    longer create a duplicate.
+  - Nothing kept the index current except live Thunderbird events, and those
+    cannot cover every case — mail synced while Thunderbird was closed, mail
+    filed by server-side rules, and sent mail produce no event the extension can
+    receive. OmniSearch now also *pulls*: on startup and once a day it asks
+    Thunderbird for anything newer than the last message it indexed. A missed
+    event now delays a message rather than hiding it permanently.
+
+  Existing indexes are upgraded in place on first load — **no rebuild is
+  required**, and nothing needs to be re-read from your mail.
+
 ### Added
 
 - **Match counts and scroll-to-load results.** Search used to return the top 100

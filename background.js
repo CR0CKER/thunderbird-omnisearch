@@ -86,6 +86,15 @@
     async knownIds() {
       return (await call('knownIds')).ids;
     },
+    async hasKey(key) {
+      return (await call('hasKey', { key })).has;
+    },
+    async maxDate(accountId) {
+      return (await call('maxDate', { accountId })).date;
+    },
+    async removeFromFolder(key, folderName) {
+      engineCount = (await call('removeFromFolder', { key, folderName })).count;
+    },
     async reset() {
       engineCount = (await call('reset')).count;
     },
@@ -150,6 +159,33 @@
     return loadPromise;
   }
 
+  // Per-account catch-up watermarks, persisted in storage.local so a suspended
+  // event page resumes where it left off instead of rescanning. Small (one
+  // number per account), so it stays out of the index snapshot entirely.
+  const WATERMARKS_KEY = 'catchUpWatermarks';
+  const watermarks = {
+    async get(accountId) {
+      try {
+        const r = await messenger.storage.local.get(WATERMARKS_KEY);
+        const marks = r && r[WATERMARKS_KEY];
+        return marks ? marks[accountId] : undefined;
+      } catch (e) {
+        console.error('[OmniSearch] reading catch-up watermark failed:', e);
+        return undefined;
+      }
+    },
+    async set(accountId, ms) {
+      try {
+        const r = await messenger.storage.local.get(WATERMARKS_KEY);
+        const marks = (r && r[WATERMARKS_KEY]) || {};
+        marks[accountId] = ms;
+        await messenger.storage.local.set({ [WATERMARKS_KEY]: marks });
+      } catch (e) {
+        console.error('[OmniSearch] writing catch-up watermark failed:', e);
+      }
+    },
+  };
+
   const controller = {
     get engine() {
       return engineProxy;
@@ -158,7 +194,21 @@
     // has finished loading the persisted index before any incremental update is
     // sent, so updates can't be applied to an empty index that's about to load.
     ensureLoaded,
+    watermarks,
   };
+
+  // Pull anything the events missed. Never let it throw into a listener: a
+  // failed catch-up must degrade to "index is behind", never to a broken
+  // background page.
+  async function runCatchUp(reason) {
+    if (building) return; // a full build is already reading everything
+    try {
+      const r = await OmniEvents.catchUp(controller);
+      if (r && r.added) console.info('[OmniSearch] catch-up (' + reason + ') indexed', r.added, 'message(s)');
+    } catch (e) {
+      console.error('[OmniSearch] catch-up failed:', e);
+    }
+  }
 
   // Full rebuild from scratch. Persistence happens once at the end (flush).
   async function rebuild() {
@@ -229,6 +279,10 @@
         await ensureLoaded();
         await OmniEvents.reconcile(controller);
         return { type: 'status', status: status() };
+      case 'catchUp':
+        await ensureLoaded();
+        await runCatchUp('requested');
+        return { type: 'status', status: status() };
       case 'open':
         await OmniOpen.openMessage(msg);
         return { type: 'ok' };
@@ -248,6 +302,12 @@
   // short repeating alarm keeps the page (and worker) alive so reopening is
   // instant. Best-effort: trades a little memory/battery for no cold start.
   const KEEPALIVE_ALARM = 'omnisearch-keepwarm';
+  // Catch-up alarm. Daily, because the watermark makes each run O(new mail) —
+  // the cost is bounded by what arrived, not by the size of the archive — and
+  // the events still deliver most mail promptly. This is the safety net for what
+  // they miss, not the primary path.
+  const CATCHUP_ALARM = 'omnisearch-catchup';
+  const CATCHUP_PERIOD_MINUTES = 24 * 60;
   async function keepWarmEnabled() {
     try {
       const r = await messenger.storage.local.get('settings');
@@ -368,15 +428,30 @@
 
   safe('registerEvents', () => OmniEvents.registerEvents(controller));
 
-  // Warm the index when Thunderbird starts a session, so the first popup is fast.
+  // Warm the index when Thunderbird starts a session, so the first popup is fast,
+  // and pull whatever arrived while Thunderbird was closed — the single largest
+  // source of missing mail, since onNewMailReceived cannot fire for it.
   safe('runtime.onStartup', () =>
-    messenger.runtime.onStartup.addListener(() => void ensureLoaded()),
+    messenger.runtime.onStartup.addListener(async () => {
+      await ensureLoaded();
+      await runCatchUp('startup');
+    }),
+  );
+
+  // Register the periodic catch-up. alarms.create is idempotent by name, so
+  // re-running this on every background-page wake simply keeps it scheduled.
+  safe('alarms.catchUp', () =>
+    messenger.alarms.create(CATCHUP_ALARM, {
+      periodInMinutes: CATCHUP_PERIOD_MINUTES,
+      delayInMinutes: 1,
+    }),
   );
 
   // Keepalive alarm handler + (re)apply when the setting changes.
   safe('alarms.onAlarm', () =>
     messenger.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === KEEPALIVE_ALARM) void ensureLoaded();
+      if (alarm.name === CATCHUP_ALARM) void runCatchUp('alarm');
     }),
   );
   // In Spotlight mode the popup is cleared, so clicking the button (and the Alt+S

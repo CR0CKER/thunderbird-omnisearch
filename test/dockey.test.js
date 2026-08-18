@@ -114,7 +114,10 @@ test('removing a message from one folder keeps the copy that still lives elsewhe
 
   const { ranked } = engine.rank('beta');
   assert.equal(ranked.length, 1, 'the message still lives in All Mail and must remain searchable');
-  assert.deepEqual(ranked[0].folders, ['All Mail'], 'the removed folder must not linger');
+  // Spread first: `folders` is built inside the vm realm, so its Array
+  // prototype differs from this one and deepStrictEqual would reject two
+  // identical arrays.
+  assert.deepEqual([...ranked[0].folders], ['All Mail'], 'the removed folder must not linger');
 });
 
 test('removing a message from its last folder discards the document', () => {

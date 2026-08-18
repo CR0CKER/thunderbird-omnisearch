@@ -20,6 +20,7 @@
   ],
   "background": {
     "scripts": [
+      "lib/dockey.js",
       "lib/extract.js",
       "lib/indexer.js",
       "lib/events.js",

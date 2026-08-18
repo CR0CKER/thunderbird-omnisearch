@@ -33,6 +33,10 @@ function loadOmniEvents(sandboxExtras) {
     sandboxExtras,
   );
   vm.createContext(sandbox);
+  // lib/dockey.js is a background script alongside lib/events.js in
+  // manifest.json, and events.js calls OmniKey.docKey — load it the same way.
+  const dockey = path.join(__dirname, '..', 'lib', 'dockey.js');
+  vm.runInContext(fs.readFileSync(dockey, 'utf8'), sandbox, { filename: dockey });
   vm.runInContext(source, sandbox, { filename: EVENTS_JS });
   return { OmniEvents: sandbox.OmniEvents, errors };
 }
@@ -41,7 +45,9 @@ function loadOmniEvents(sandboxExtras) {
 // what the engine already holds, keyed the way the engine keys it (by id).
 function makeWorld({ live, indexed }) {
   const liveMap = new Map(live.map((m) => [String(m.id), m]));
-  const store = new Map(indexed.map((d) => [String(d.id), d]));
+  const store = new Map(
+    indexed.map((d) => [(d.accountId || 'account1') + '\0' + d.headerMessageId, d]),
+  );
 
   const messenger = {
     messages: {
@@ -53,12 +59,19 @@ function makeWorld({ live, indexed }) {
     },
   };
 
+  const key = (m) => (m.accountId || 'account1') + '\0' + m.headerMessageId;
+
   const OmniIndexer = {
-    async collectAllMessageIds() {
-      return new Set(liveMap.keys());
+    // stableKey -> numeric id, as lib/indexer.js now returns.
+    async collectAllMessageKeys() {
+      return new Map([...liveMap.values()].map((m) => [key(m), String(m.id)]));
     },
     async headerToDoc(header) {
-      return { id: String(header.id), headerMessageId: header.headerMessageId };
+      return {
+        id: String(header.id),
+        accountId: header.accountId || 'account1',
+        headerMessageId: header.headerMessageId,
+      };
     },
     async getExcludedAccounts() {
       return new Set();
@@ -81,10 +94,13 @@ function makeWorld({ live, indexed }) {
         return [...store.keys()];
       },
       async upsert(doc) {
-        store.set(String(doc.id), doc);
+        store.set(key(doc), doc);
       },
-      async remove(ids) {
-        for (const id of ids) store.delete(String(id));
+      async remove(keys) {
+        for (const k of keys) store.delete(k);
+      },
+      async removeFromFolder(k) {
+        store.delete(k);
       },
     },
   };
@@ -248,7 +264,7 @@ function makeCatchUpWorld({ messages, indexedKeys = [], watermark }) {
     },
   };
 
-  return { host, ctrl, added, marks };
+  return { host, ctrl, added, marks, OmniIndexer };
 }
 
 function header(over = {}) {
@@ -271,7 +287,7 @@ test('catchUp indexes mail that arrived while the events were not delivered', as
   });
   const { OmniEvents } = loadOmniEvents({
     messenger: world.host.messenger,
-    OmniIndexer: world.ctrl.OmniIndexer,
+    OmniIndexer: world.OmniIndexer,
   });
 
   await OmniEvents.catchUp(world.ctrl, { now: Date.parse('2026-08-18T21:00:00Z') });
@@ -288,7 +304,7 @@ test('catchUp queries forward from the watermark, not across the whole archive',
   const world = makeCatchUpWorld({ messages: [header()], watermark });
   const { OmniEvents } = loadOmniEvents({
     messenger: world.host.messenger,
-    OmniIndexer: world.ctrl.OmniIndexer,
+    OmniIndexer: world.OmniIndexer,
   });
 
   await OmniEvents.catchUp(world.ctrl, { now: Date.parse('2026-08-18T21:00:00Z') });
@@ -317,7 +333,7 @@ test('catchUp still catches a message dated just before the watermark', async ()
   });
   const { OmniEvents } = loadOmniEvents({
     messenger: world.host.messenger,
-    OmniIndexer: world.ctrl.OmniIndexer,
+    OmniIndexer: world.OmniIndexer,
   });
 
   await OmniEvents.catchUp(world.ctrl, { now: Date.parse('2026-08-18T21:00:00Z') });
@@ -333,7 +349,7 @@ test('catchUp skips mail already indexed, so a quiet run costs nothing', async (
   });
   const { OmniEvents } = loadOmniEvents({
     messenger: world.host.messenger,
-    OmniIndexer: world.ctrl.OmniIndexer,
+    OmniIndexer: world.OmniIndexer,
   });
 
   await OmniEvents.catchUp(world.ctrl, { now: Date.parse('2026-08-18T21:00:00Z') });
@@ -348,7 +364,7 @@ test('catchUp advances the watermark so the next run stays cheap', async () => {
   });
   const { OmniEvents } = loadOmniEvents({
     messenger: world.host.messenger,
-    OmniIndexer: world.ctrl.OmniIndexer,
+    OmniIndexer: world.OmniIndexer,
   });
 
   await OmniEvents.catchUp(world.ctrl, { now: Date.parse('2026-08-18T21:00:00Z') });
@@ -373,7 +389,7 @@ test('catchUp follows pagination instead of indexing only the first page', async
   const world = makeCatchUpWorld({ messages, watermark: Date.parse('2026-08-01T00:00:00Z') });
   const { OmniEvents } = loadOmniEvents({
     messenger: world.host.messenger,
-    OmniIndexer: world.ctrl.OmniIndexer,
+    OmniIndexer: world.OmniIndexer,
   });
 
   await OmniEvents.catchUp(world.ctrl, { now: Date.parse('2026-08-18T21:00:00Z') });

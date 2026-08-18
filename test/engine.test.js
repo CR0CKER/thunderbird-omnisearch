@@ -23,13 +23,14 @@ const vm = require('node:vm');
 const LIB = path.join(__dirname, '..', 'lib');
 
 // lib/engine.js is an IIFE assigning globalThis.OmniEngine, and it depends on
-// globalThis.MiniSearch. Running the vendored UMD build first in the same vm
+// globalThis.MiniSearch and globalThis.OmniKey (lib/dockey.js — the shared
+// document-key derivation, loaded on both sides of the worker boundary). Running the vendored UMD build first in the same vm
 // context satisfies that: with no `module`/`exports` in a bare sandbox the UMD
 // wrapper takes its `global.MiniSearch = factory()` branch (lib/minisearch.js:1-11).
 function loadOmniEngine() {
   const sandbox = { console };
   vm.createContext(sandbox);
-  for (const file of ['minisearch.js', 'query.js', 'engine.js']) {
+  for (const file of ['minisearch.js', 'query.js', 'dockey.js', 'engine.js']) {
     const full = path.join(LIB, file);
     vm.runInContext(fs.readFileSync(full, 'utf8'), sandbox, { filename: full });
   }
