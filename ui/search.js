@@ -40,6 +40,11 @@
   // simply stays as it is, which is the behaviour being asked for anyway.
   let lastRequestedHeight = 0;
   let userSizedWindow = false;
+  // Window managers do not always land on the height we asked for — GNOME adds
+  // its own chrome, and the settled value can differ by tens of pixels. Resize
+  // events inside this grace period after our own request are therefore treated
+  // as the WM answering us, and re-baseline what we consider "our" height.
+  let suppressResizeUntil = 0;
 
   // Height the content WANTS, independent of the height it has been given.
   // document.body.scrollHeight cannot answer this any more: in the modal the
@@ -70,6 +75,7 @@
     // position (set in background.js for the expanded height). We never move the
     // top, so there's no jerky repositioning as results appear.
     lastRequestedHeight = target;
+    suppressResizeUntil = Date.now() + 750;
     messenger.windows.update(modalWinId, { height: target }).catch(() => {});
   }
 
@@ -624,10 +630,11 @@
     // Floor the window at its opening size so the empty/loading state never
     // resizes (only real results grow it) — kills the open-time flicker.
     modalMinHeight = MODAL_MIN_H;
-    // Seed with the height the window was opened at, so a drag that happens
-    // BEFORE any auto-fit still counts as the user sizing it. Without this the
-    // guard below stays unarmed and the first search yanks the window back.
-    lastRequestedHeight = MODAL_MIN_H;
+    // Deliberately NOT seeded with MODAL_MIN_H. Doing so broke auto-growth
+    // outright: GNOME reports an opening height that includes its own chrome, so
+    // the first resize event looked like a user drag, the guard latched, and the
+    // window then stayed at its tiny opening size forever. The guard arms only
+    // once we have actually requested a height of our own.
     // Learn our own window id, then size to fit and keep fitting as content
     // (results) changes.
     messenger.windows
@@ -642,9 +649,14 @@
     // event fires synchronously, while the observer below defers to a frame, so
     // this flag is always set before fitModalWindow could fight the drag.
     window.addEventListener('resize', () => {
+      // Within the grace period this is the WM responding to us, not the user.
+      // Adopt whatever height it settled on as the new baseline, so a compositor
+      // that adds chrome cannot later look like a drag.
+      if (Date.now() < suppressResizeUntil) {
+        lastRequestedHeight = window.outerHeight;
+        return;
+      }
       if (userSizedWindow || !lastRequestedHeight) return;
-      // Generous tolerance: window managers round and add their own chrome, and
-      // a false positive here only means we stop resizing, never that we fight.
       if (Math.abs(window.outerHeight - lastRequestedHeight) > 24) userSizedWindow = true;
     });
 
