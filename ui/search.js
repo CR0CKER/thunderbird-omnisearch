@@ -47,15 +47,37 @@
   // as the WM answering us, and re-baseline what we consider "our" height.
   let suppressResizeUntil = 0;
 
+  // Rows above which the result list is certainly taller than any height we would
+  // ever ask for. `maxContent` is capped at 560px and a single result row (subject
+  // + meta + preview) is never under 30px, so 20 rows clears it with room to
+  // spare. Deliberately conservative: being wrong here only means paying for one
+  // scrollHeight read we could have skipped.
+  const ROWS_CERTAINLY_OVERFLOWING = 20;
+
   // Height the content WANTS, independent of the height it has been given.
   // document.body.scrollHeight cannot answer this any more: in the modal the
   // body is a full-height flex column, so its scrollHeight is just the viewport.
   // Summing the blocks — with the list's full scrollHeight rather than its
   // allocated box — measures the content itself.
-  function naturalContentHeight() {
+  //
+  // `resultsEl.scrollHeight` forces a SYNCHRONOUS LAYOUT OF THE WHOLE LIST. That
+  // was cheap when the list was capped at 100 rows; with paging it can hold
+  // thousands, and this runs on every resize frame (the ResizeObserver) and every
+  // 500ms status poll — which is what made dragging the window flicker on Linux.
+  // Once the list alone exceeds the cap the exact figure cannot change the
+  // outcome, because the caller clamps to `maxContent` anyway. childElementCount
+  // is a cheap DOM read that triggers no layout, so we use it to skip the
+  // expensive one.
+  function naturalContentHeight(maxContent) {
     let total = 0;
     for (const el of document.body.children) {
-      total += el === resultsEl ? resultsEl.scrollHeight : el.offsetHeight;
+      if (el !== resultsEl) {
+        total += el.offsetHeight;
+      } else if (resultsEl.childElementCount > ROWS_CERTAINLY_OVERFLOWING) {
+        total += maxContent;
+      } else {
+        total += resultsEl.scrollHeight;
+      }
     }
     return total;
   }
@@ -64,7 +86,7 @@
     if (!isModal || modalWinId == null) return;
     if (userSizedWindow) return; // their window, their height
     const maxContent = Math.min(560, Math.round((screen.availHeight || 900) * 0.7));
-    const content = Math.min(naturalContentHeight(), maxContent);
+    const content = Math.min(naturalContentHeight(maxContent), maxContent);
     const chrome = Math.max(0, window.outerHeight - window.innerHeight);
     // Grow to fit content (header on open, then results), floored so the window
     // never shrinks below its opening size. The loading hint is the field
@@ -376,14 +398,26 @@
   // Renders the FIRST page of a reply and (re)seeds the paging state. Takes the
   // whole reply rather than seven positional fields — it now carries paging
   // metadata (total/hasMore/capped) alongside the results and parse errors.
+  // Wipe every part of the result view together. The count line and the paging
+  // state go with the results that produced them, for exactly the reason the
+  // chips do: "Showing 300 of 22,596 matches" left standing over an emptied list
+  // claims results that are no longer on screen. Esc-to-clear routes through
+  // here, which is what makes the count vanish with everything else.
+  function clearResultsView() {
+    resultsEl.replaceChildren();
+    emptyEl.replaceChildren();
+    resultsMetaEl.textContent = '';
+    // Chips must go with the query that produced them — a chip left behind
+    // would claim a filter that is no longer being applied.
+    chipsEl.replaceChildren();
+    resetPaging();
+  }
+
   function renderResults(reply, query) {
     const results = reply.results || [];
     const { errors, filters, applied } = reply;
     const freeText = reply.text || '';
-    resultsEl.replaceChildren();
-    emptyEl.replaceChildren();
-    resultsMetaEl.textContent = '';
-    resetPaging();
+    clearResultsView();
     renderChips(applied, freeText);
 
     // A rejected date operator MUST be shown. Dropping it silently would run an
@@ -705,11 +739,7 @@
   clearBtn.addEventListener('click', () => {
     queryInput.value = '';
     syncQueryUi();
-    resultsEl.replaceChildren();
-    emptyEl.replaceChildren();
-    // Chips must go with the query that produced them — a chip left behind
-    // would claim a filter that is no longer being applied.
-    chipsEl.replaceChildren();
+    clearResultsView();
     queryInput.focus();
   });
 

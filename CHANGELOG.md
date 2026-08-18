@@ -33,6 +33,9 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   than a row inside it, with a separate invisible sentinel driving the scroll
   trigger. Sharing one element made the count unreachable: nearing it loaded
   another page and pushed it further down.
+- The window no longer forces a full-list layout on every resize frame, which
+  made dragging the centered window flicker on Linux once a few pages had been
+  loaded.
 
 ## [0.8.0] - 2026-08-18
 

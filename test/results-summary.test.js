@@ -50,7 +50,7 @@ test('footer: everything arrived in the first page — say nothing', () => {
 
 test('footer: a truncated first page reports the real total', () => {
   const t = OmniResults.footerText(state({ shown: 100, total: 1247, hasMore: true }), PAGE);
-  assert.equal(t, `Showing ${n(100)} of ${n(1247)} matches — scroll for more`);
+  assert.equal(t, `Showing ${n(100)} of ${n(1247)} matches`);
 });
 
 test('footer: paging to the end still reports the total — the regression', () => {
