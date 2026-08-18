@@ -44,6 +44,12 @@ invoice from:alice@corp.com date:2024-06..2024-07
 | `after:2024-06` | From 1 June onwards. |
 | `before:2024-06` | Up to and including 30 June. |
 | `from:alice` / `to:bob` | Matches the sender or recipient only — not the message body. |
+| `newer_than:7d` | The last 7 days. Units `d`, `w`, `m`, `y` — so `2w`, `3m`, `1y`. |
+| `older_than:1y` | Everything older than that. Exactly the mail `newer_than:1y` leaves out. |
+| `date:today` | Also `yesterday`, `this-week` (Monday–Sunday), `this-month`, `this-year`. |
+
+Named periods are values like any other, so they compose: `after:today`,
+`before:yesterday`, `date:yesterday..today` all work.
 
 One rule covers all of it: **a date means the whole period you named**, and
 `after:` starts at its beginning while `before:` runs to its end. So

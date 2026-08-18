@@ -557,3 +557,125 @@ test('a rejected or unresolved operator contributes no chip', () => {
     assert.equal(parse(q).applied.length, 0, q);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Relative durations and named periods
+//
+// NOW is 15 January 2026, a Thursday — so "this-week" spans Mon 12 to Sun 18
+// and the week boundary is actually exercised rather than landing on it.
+// ---------------------------------------------------------------------------
+
+const startOfDayAgo = (days) => {
+  const d = new Date(NOW);
+  d.setDate(d.getDate() - days);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+
+test('newer_than: starts at the beginning of the day N days ago', () => {
+  const r = parse('newer_than:7d');
+  assert.equal(r.filters.after, startOfDayAgo(7));
+  assert.equal(r.filters.before, null, 'newer_than sets no upper bound');
+});
+
+test('older_than: ends just before that same instant', () => {
+  const r = parse('older_than:7d');
+  assert.equal(r.filters.before, startOfDayAgo(7) - 1);
+  assert.equal(r.filters.after, null, 'older_than sets no lower bound');
+});
+
+test('newer_than and older_than are exactly complementary', () => {
+  // No overlap and no gap: every message falls in exactly one of the two.
+  // Snapping both to the same day boundary is what makes this hold.
+  const newer = parse('newer_than:30d').filters.after;
+  const older = parse('older_than:30d').filters.before;
+  assert.equal(newer, older + 1);
+});
+
+test('duration units cover days, weeks, months and years', () => {
+  assert.equal(parse('newer_than:1w').filters.after, startOfDayAgo(7));
+  assert.equal(parse('newer_than:14d').filters.after, startOfDayAgo(14));
+  // Months and years step the calendar, so they respect month lengths rather
+  // than assuming 30/365 days.
+  const monthAgo = new Date(NOW);
+  monthAgo.setMonth(monthAgo.getMonth() - 3);
+  monthAgo.setHours(0, 0, 0, 0);
+  assert.equal(parse('newer_than:3m').filters.after, monthAgo.getTime());
+  const yearAgo = new Date(NOW);
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  yearAgo.setHours(0, 0, 0, 0);
+  assert.equal(parse('newer_than:1y').filters.after, yearAgo.getTime());
+});
+
+test('durations are case-insensitive and reported as a chip', () => {
+  assert.equal(parse('newer_than:7D').filters.after, startOfDayAgo(7));
+  const r = parse('invoice newer_than:7d');
+  assert.equal(r.applied.length, 1);
+  assert.equal(r.applied[0].source, 'newer_than:7d');
+  assert.equal(r.text, 'invoice');
+});
+
+test('a bad duration is reported, and an empty one stays quiet', () => {
+  const bad = parse('newer_than:7x mail');
+  assert.equal(bad.filters.after, null);
+  assert.equal(bad.errors.length, 1);
+  // Still being typed at the end of the query: no filter, no complaint.
+  assert.equal(parse('newer_than:').errors.length, 0);
+  assert.equal(parse('newer_than:').filters.after, null);
+});
+
+test('date:today and date:yesterday cover exactly those days', () => {
+  const today = parse('date:today');
+  assert.equal(today.filters.after, startOfDayAgo(0));
+  assert.equal(today.filters.before, startOfDayAgo(-1) - 1);
+
+  const yesterday = parse('date:yesterday');
+  assert.equal(yesterday.filters.after, startOfDayAgo(1));
+  assert.equal(yesterday.filters.before, startOfDayAgo(0) - 1);
+});
+
+test('date:this-week runs Monday to Sunday', () => {
+  // Monday-start is the ISO convention. It is a real choice — some locales
+  // start on Sunday — so it is pinned here rather than left to chance.
+  const r = parse('date:this-week');
+  const start = new Date(r.filters.after);
+  const end = new Date(r.filters.before);
+  assert.equal(start.getDay(), 1, 'starts on a Monday');
+  assert.equal(start.getDate(), 12);
+  assert.equal(end.getDay(), 0, 'ends on a Sunday');
+  assert.equal(end.getDate(), 18);
+});
+
+test('date:this-month and date:this-year match the calendar period', () => {
+  const month = parse('date:this-month');
+  assert.equal(month.filters.after, startOf(2026, 1));
+  assert.equal(month.filters.before, endOfMonth(2026, 1));
+
+  const year = parse('date:this-year');
+  assert.equal(year.filters.after, startOf(2026));
+  assert.equal(year.filters.before, endOfYear(2026));
+});
+
+test('named periods work with after:, before: and ranges', () => {
+  // They are periods like any other value, so the period rule applies unchanged.
+  assert.equal(parse('after:today').filters.after, startOfDayAgo(0));
+  assert.equal(parse('after:today').filters.before, null);
+  assert.equal(parse('before:yesterday').filters.before, startOfDayAgo(0) - 1);
+
+  const span = parse('date:yesterday..today');
+  assert.equal(span.filters.after, startOfDayAgo(1));
+  assert.equal(span.filters.before, startOfDayAgo(-1) - 1);
+});
+
+test('named periods are case-insensitive', () => {
+  assert.equal(parse('date:This-Month').filters.after, parse('date:this-month').filters.after);
+});
+
+test('an unknown word after a date operator is still plain text', () => {
+  // date:tomorrow is not supported; it must not become a silent no-op filter,
+  // and it must not error either — it is simply not a date, like after:party.
+  const r = parse('date:tomorrow');
+  assert.equal(r.filters.after, null);
+  assert.equal(r.errors.length, 0);
+  assert.match(r.text, /date:tomorrow/);
+});
