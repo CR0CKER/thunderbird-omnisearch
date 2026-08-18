@@ -557,3 +557,53 @@ test('a rejected or unresolved operator contributes no chip', () => {
     assert.equal(parse(q).applied.length, 0, q);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Source offsets — what the in-field highlight needs
+//
+// The search field paints a tinted pill behind each operator. To place one, the
+// UI needs the operator's exact character range in the raw query, not just its
+// text: searching for the text again would pick the wrong occurrence whenever a
+// query repeats a token.
+// ---------------------------------------------------------------------------
+
+test('applied reports the character range of each operator', () => {
+  const q = 'invoice from:alice date:2024-06';
+  const r = parse(q);
+  for (const entry of r.applied) {
+    assert.equal(q.slice(entry.start, entry.end), entry.source, entry.op);
+  }
+});
+
+test('offsets survive a multi-word date value', () => {
+  const q = 'invoice date:7 july 2024 receipt';
+  const r = parse(q);
+  assert.equal(r.applied.length, 1);
+  assert.equal(q.slice(r.applied[0].start, r.applied[0].end), 'date:7 july 2024');
+});
+
+test('offsets are correct when the same operator text repeats', () => {
+  // The reason offsets exist rather than re-finding the text: indexOf would
+  // return the first occurrence for both entries.
+  const q = 'date:2024-06 date:2024-06';
+  const r = parse(q);
+  assert.equal(r.applied.length, 2);
+  assert.notEqual(r.applied[0].start, r.applied[1].start);
+  for (const entry of r.applied) {
+    assert.equal(q.slice(entry.start, entry.end), 'date:2024-06');
+  }
+});
+
+test('offsets account for irregular whitespace', () => {
+  const q = '  invoice    from:alice   date:2024-06  ';
+  const r = parse(q);
+  for (const entry of r.applied) {
+    assert.equal(q.slice(entry.start, entry.end), entry.source, entry.op);
+  }
+});
+
+test('an operator that was not applied has no range to paint', () => {
+  for (const q of ['after:party', 'date:7/6/2024', 'date:2']) {
+    assert.equal(parse(q).applied.length, 0, q);
+  }
+});

@@ -8,6 +8,7 @@
   --hover: #f0f6ff;
   --chip-bg: #eef1f5;
   --chip-hover: #dde2e9;
+  --op-bg: #dbe7f6;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -18,6 +19,7 @@
     --hover: #2a2a33;
     --chip-bg: #2b2b34;
     --chip-hover: #3a3a45;
+    --op-bg: #2f4056;
   }
 }
 
@@ -50,14 +52,53 @@ header {
 }
 
 .search-box { position: relative; flex: 1; display: flex; }
+/* The input and its highlight overlay must lay text out IDENTICALLY, or the
+   pills drift out from under the words. Every property that affects glyph
+   advance or the text origin is declared here for both. */
+#q,
+.highlight {
+  padding: 10px 34px 10px 12px;
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: normal;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  white-space: pre;
+  text-align: left;
+}
 #q {
   flex: 1;
-  padding: 10px 34px 10px 12px;
-  font-size: 15px;
   color: var(--fg);
+  /* Transparent so the overlay's pills show through from behind. The field's
+     own surface colour moves to .search-box. */
+  background: transparent;
+  border-color: var(--border);
+  position: relative; /* above .highlight */
+  z-index: 1;
+}
+/* Carries what the input used to paint, so the input itself can be see-through. */
+.search-box {
   background: var(--bg);
-  border: 1px solid var(--border);
   border-radius: 8px;
+}
+.highlight {
+  position: absolute;
+  inset: 0;
+  /* Invisible text: it exists only to position the pills. The glyphs you see
+     are the real input's, so caret, selection and IME are untouched. */
+  color: transparent;
+  overflow: hidden;
+  pointer-events: none;
+}
+.highlight .op {
+  /* Padding widens the tint without moving the text: the equal negative margin
+     cancels its effect on layout, keeping the run's advance width identical to
+     the input's. This is why the pill can breathe but must NOT be italic or
+     bold — those reshape the glyphs themselves and the alignment drifts. */
+  padding: 2px 4px;
+  margin: 0 -4px;
+  border-radius: 6px;
+  background: var(--op-bg);
 }
 #q:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
 #q:disabled { opacity: 0.6; cursor: progress; }
@@ -82,6 +123,10 @@ header {
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
+  /* Must sit above #q, which is now a positioned element (z-index 1) so it can
+     stack over the highlight layer. Without this the input would cover the
+     button and swallow its clicks. */
+  z-index: 2;
 }
 .clear:hover { background: var(--hover); color: var(--fg); }
 
