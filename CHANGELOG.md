@@ -24,6 +24,17 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   filter exists and what a valid value looks like. Click one to drop it into the
   search box, then type the value. They disappear as soon as you start typing.
 
+### Fixed
+
+- **A taller search window now fills with results.** Dragging the centered search
+  window taller left most of it empty: the result list was capped at a fixed
+  height regardless of the window. The list now fills whatever height the window
+  has, and once you size the window yourself it keeps that size instead of
+  snapping back on the next search.
+- The **×** on a filter chip is now centred in its hover circle, and the
+  "encrypted" / "header-only" badge sits on the same line as the subject beside
+  it rather than hanging below it.
+
 ### Changed
 
 - The toolbar button's tooltip is now just "OmniSearch", rather than

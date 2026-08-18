@@ -295,11 +295,31 @@ ul#results {
      with, so nothing is actually lost to the clip. */
   overflow-x: hidden;
 }
-/* Centered standalone window (ui/search.html#modal): fill the window width and
-   take natural (content) height — search.js resizes the window itself so it
-   starts at just the search field and grows as results come in (#results keeps
-   its max-height cap and scrolls once long). */
-html.modal body { width: 100%; }
+/* Centered standalone window (ui/search.html#modal). Unlike the toolbar popup —
+   which sizes to its content and cannot be resized by the user — this window can
+   be dragged taller, and the result list must then fill it.
+   That needs a definite height to fill, so the document is a full-height flex
+   column with the list as the growing item. Without this the list kept its
+   460px cap and a tall window sat half empty. */
+html.modal,
+html.modal body {
+  height: 100%;
+}
+html.modal body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+html.modal ul#results {
+  flex: 1 1 auto;
+  min-height: 0; /* or the flex item refuses to shrink and scroll */
+  max-height: none; /* the window is the cap now, not a fixed 460px */
+}
+/* With no results the list must not claim the space, or the "No matches" line
+   below it is pushed to the bottom of the window. */
+html.modal ul#results:empty {
+  flex: 0 0 auto;
+}
 
 li.result {
   padding: 10px 14px;
