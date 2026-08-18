@@ -247,16 +247,16 @@ button:hover { background: var(--hover); }
   border-radius: 50%;
   background: none;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1;
   cursor: pointer;
-  /* Centre the glyph in the round hover background. Without these the x is laid
-     out as a normal line box and lands off-centre inside the circle — the same
-     recipe .clear already uses for the field's own clear button. */
+  /* The x is an inline SVG (see closeIcon()), so centring the box centres the
+     mark itself. A text "×" cannot be centred this way: the glyph sits on the
+     font's math axis, above the middle of its em box, so it reads high inside
+     the round hover background however the box is aligned. */
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
+.chip .chip-remove svg { display: block; }
 .chip .chip-remove:hover {
   background: var(--chip-hover);
   color: var(--fg);
@@ -325,6 +325,15 @@ li.result:focus {
   border-radius: 6px;
   padding: 0 5px;
   margin-left: 6px;
+  /* Inline elements sit on the shared baseline, which leaves this badge low
+     against the larger subject text next to it — its own text lines up, but the
+     pill around it hangs below the subject's optical centre. inline-block gives
+     it a real box, and vertical-align centres that box on the parent's midline. */
+  display: inline-block;
+  vertical-align: middle;
+  /* Nudges the pill's own text off the bottom of its border without growing the
+     line box beyond the subject's. */
+  line-height: 1.45;
 }
 .date { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .meta { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }

@@ -272,6 +272,24 @@
     return `on or before ${d(entry.before)}`;
   }
 
+  // A geometrically centred ✕, matching the inline-SVG approach already used for
+  // the settings button. currentColor so it follows the theme and hover state.
+  function closeIcon() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 12 12');
+    svg.setAttribute('width', '10');
+    svg.setAttribute('height', '10');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', 'M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(path);
+    return svg;
+  }
+
   // Rebuild the query from the chips the user kept, plus the leftover free
   // text. Reconstructing beats cutting the removed operator out of the raw
   // string, which would be ambiguous whenever the same text appears twice.
@@ -299,7 +317,11 @@
       const remove = document.createElement('button');
       remove.className = 'chip-remove';
       remove.type = 'button';
-      remove.textContent = '×';
+      // Drawn, not typed. The "×" character sits on the font's math axis, above
+      // the centre of its em box, so it renders high inside the round hover
+      // background no matter how the box itself is centred — flex centring the
+      // line box does not move the glyph within it. An SVG has no such metrics.
+      remove.appendChild(closeIcon());
       remove.title = `Remove ${entry.source}`;
       remove.setAttribute('aria-label', `Remove filter ${chipLabel(entry)}`);
       remove.addEventListener('click', () => removeFilter(applied, index, freeText));
