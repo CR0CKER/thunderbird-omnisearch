@@ -295,6 +295,12 @@ button:hover { background: var(--hover); }
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
+  /* Centre the glyph in the round hover background. Without these the x is laid
+     out as a normal line box and lands off-centre inside the circle — the same
+     recipe .clear already uses for the field's own clear button. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .chip .chip-remove:hover {
   background: var(--chip-hover);
