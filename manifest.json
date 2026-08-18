@@ -28,7 +28,7 @@
     ]
   },
   "action": {
-    "default_title": "OmniSearch — search your mail",
+    "default_title": "OmniSearch",
     "default_popup": "ui/search.html",
     "default_icon": "icons/search.svg"
   },

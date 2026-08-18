@@ -26,6 +26,8 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 
 ### Changed
 
+- The toolbar button's tooltip is now just "OmniSearch", rather than
+  "OmniSearch — search your mail".
 - The search window no longer shows "X messages indexed · updated …". It was
   read once and then ignored, while occupying the most visible line in the
   window; the filter suggestions above use that space instead. The index count
