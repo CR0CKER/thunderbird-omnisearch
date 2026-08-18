@@ -10,7 +10,6 @@
   const progressEl = $('progress');
   const emptyEl = $('empty');
   const chipsEl = $('chips');
-  const highlightEl = $('qhl');
   const loadingEl = $('loading');
 
   // Launched as the centered standalone window (background opens
@@ -152,47 +151,6 @@
         syncTemplateVisibility();
       }
     }
-  }
-
-  // Paint a tinted pill behind each recognised operator, inside the field.
-  //
-  // Parsed locally (lib/query.js is loaded in this page too) rather than waiting
-  // for the search reply, so the pill tracks typing with no lag AND agrees
-  // exactly with what the engine will do — a highlight that disagreed with the
-  // parser would be worse than none. Only operators that actually RESOLVED are
-  // painted, so `after:party` and a half-typed `date:2` stay plain, which makes
-  // the tint a live signal that a filter took effect.
-  function renderHighlight() {
-    const value = queryInput.value;
-    highlightEl.replaceChildren();
-    if (!value) return;
-
-    let applied = [];
-    try {
-      // Never let a highlighting problem break the search field itself.
-      applied = (globalThis.OmniQuery ? OmniQuery.parse(value, Date.now()).applied : []) || [];
-    } catch (e) {
-      return;
-    }
-
-    let cursor = 0;
-    for (const entry of applied) {
-      if (entry.start == null || entry.start < cursor) continue; // defensive
-      if (entry.start > cursor) highlightEl.append(value.slice(cursor, entry.start));
-      const pill = document.createElement('span');
-      pill.className = 'op';
-      pill.textContent = value.slice(entry.start, entry.end);
-      highlightEl.appendChild(pill);
-      cursor = entry.end;
-    }
-    highlightEl.append(value.slice(cursor));
-    syncHighlightScroll();
-  }
-
-  // Long queries scroll inside the input; the overlay has no scrollbar of its
-  // own, so it is shifted by the same amount to stay aligned.
-  function syncHighlightScroll() {
-    highlightEl.scrollLeft = queryInput.scrollLeft;
   }
 
   // Filter templates shown in the status row while the field is empty. Each is a
@@ -522,11 +480,9 @@
   function syncQueryUi() {
     clearBtn.hidden = queryInput.value.length === 0;
     syncTemplateVisibility();
-    renderHighlight();
   }
 
   let debounce;
-  queryInput.addEventListener('scroll', syncHighlightScroll);
   queryInput.addEventListener('input', () => {
     syncQueryUi();
     if (debounce) clearTimeout(debounce);

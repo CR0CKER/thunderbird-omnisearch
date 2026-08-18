@@ -9,11 +9,6 @@
   <body>
     <header>
       <div class="search-box">
-        <!-- Paints a tinted pill behind each recognised operator. It sits BEHIND
-             the real input and renders its text transparently, contributing only
-             the backgrounds — so the visible glyphs, caret and selection all
-             remain the browser's own. aria-hidden: it duplicates the field. -->
-        <div id="qhl" class="highlight" aria-hidden="true"></div>
         <input
           id="q"
           type="search"
@@ -48,7 +43,6 @@
     <ul id="results"></ul>
     <div id="empty" class="empty"></div>
 
-    <script src="../lib/query.js"></script>
     <script src="search.js"></script>
   </body>
 </html>

@@ -24,17 +24,8 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   filter exists and what a valid value looks like. Click one to drop it into the
   search box, then type the value. They disappear as soon as you start typing.
 
-- **Operators are tinted inside the search box.** A recognised filter such as
-  `from:alice` or `date:7 july 2024` now gets a soft rounded highlight as you
-  type it, so it reads as one unit rather than as loose words. Only filters that
-  actually took effect are tinted, so the highlight doubles as confirmation:
-  `after:party` stays plain text, and a half-typed `date:2` stays plain until it
-  resolves.
-
 ### Changed
 
-- The line under the search box has been removed, and the filter chips no longer
-  sit flush against it.
 - The search window no longer shows "X messages indexed · updated …". It was
   read once and then ignored, while occupying the most visible line in the
   window; the filter suggestions above use that space instead. The index count

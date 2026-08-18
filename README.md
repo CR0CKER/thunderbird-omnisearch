@@ -61,11 +61,6 @@ wrong month — you would simply get the wrong mail and never know. Anything the
 filter can't understand is reported in the results area, so a filter is never
 dropped silently.
 
-As you type, a recognised filter is tinted inside the search box, so it reads as
-one unit instead of loose words. Only filters that actually took effect are
-tinted — `after:party` stays plain text — so the highlight also tells you the
-filter was understood.
-
 While the search box is empty, the line beneath it lists the available filters
 with an example value each — click one to drop it into the box and type the
 value. They step aside as soon as you start typing.
