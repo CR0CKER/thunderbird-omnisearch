@@ -44,7 +44,9 @@ header {
   align-items: center;
   padding: 12px;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  /* No bottom border: the field already reads as its own control, and a rule
+     under it just added a line for the filter chips to collide with. The header
+     stays opaque, so results still pass cleanly beneath it when scrolling. */
 }
 
 .search-box { position: relative; flex: 1; display: flex; }
@@ -213,7 +215,9 @@ button:hover { background: var(--hover); }
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 0 14px 8px;
+  /* Top padding matters: with the header's rule gone the chips would otherwise
+     sit flush against the search field. */
+  padding: 4px 14px 8px;
 }
 .chip {
   display: inline-flex;
