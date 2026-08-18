@@ -396,3 +396,83 @@ test('catchUp follows pagination instead of indexing only the first page', async
 
   assert.equal(world.added.length, 250, 'every page of the query must be consumed');
 });
+
+// ---------------------------------------------------------------------------
+// One-time deep sweep after migrating a faulty index.
+//
+// Why these tests exist: the watermark catch-up assumes everything below the
+// mark is already indexed. An index written under the old numeric keying breaks
+// that assumption — it can be missing months of mail while still holding a
+// message from today, so the mark seeds near now and the pull skips the hole
+// entirely. Everyone upgrading carries such an index, so migration must trigger
+// one deep sweep, and that sweep must be durable: marking it done before it
+// finishes would leave mail permanently missing.
+
+function makeSweepWorld({ pending, reconcileThrows = false }) {
+  const world = makeWorld({
+    live: [
+      { id: 7, headerMessageId: 'kept@example.com' },
+      { id: 8, headerMessageId: 'missed@example.com' },
+    ],
+    indexed: [{ id: 7, headerMessageId: 'kept@example.com' }],
+  });
+  let isPending = pending;
+  const cleared = [];
+  world.ctrl.sweepState = {
+    async pending() { return isPending; },
+    async clear() { isPending = false; cleared.push(true); },
+  };
+  if (reconcileThrows) {
+    world.OmniIndexer.collectAllMessageKeys = async () => {
+      throw new Error('interrupted mid-walk');
+    };
+  }
+  world.cleared = cleared;
+  world.stillPending = () => isPending;
+  return world;
+}
+
+test('a migrated index gets one deep sweep, which finds what the watermark cannot', async () => {
+  const world = makeSweepWorld({ pending: true });
+  const { OmniEvents } = loadOmniEvents({
+    messenger: world.messenger,
+    OmniIndexer: world.OmniIndexer,
+  });
+
+  const r = await OmniEvents.deepSweepIfPending(world.ctrl);
+
+  assert.equal(r.swept, true);
+  assert.ok(
+    world.indexedMessageIds().has('missed@example.com'),
+    'the sweep must index mail the faulty index never recorded',
+  );
+  assert.equal(world.stillPending(), false, 'a completed sweep must not run again');
+});
+
+test('an index that never needed the sweep does not pay for one', async () => {
+  const world = makeSweepWorld({ pending: false });
+  const { OmniEvents } = loadOmniEvents({
+    messenger: world.messenger,
+    OmniIndexer: world.OmniIndexer,
+  });
+
+  const r = await OmniEvents.deepSweepIfPending(world.ctrl);
+
+  assert.equal(r.swept, false);
+  assert.equal(world.added === undefined ? 0 : world.added.length, 0);
+});
+
+test('an interrupted sweep stays pending and runs again', async () => {
+  // Thunderbird quits, or the event page suspends, mid-walk. Clearing the flag
+  // optimistically would strand every message the walk had not reached yet.
+  const world = makeSweepWorld({ pending: true, reconcileThrows: true });
+  const { OmniEvents } = loadOmniEvents({
+    messenger: world.messenger,
+    OmniIndexer: world.OmniIndexer,
+  });
+
+  await assert.rejects(() => OmniEvents.deepSweepIfPending(world.ctrl));
+
+  assert.equal(world.stillPending(), true, 'a sweep that did not finish must not be marked done');
+  assert.equal(world.cleared.length, 0);
+});

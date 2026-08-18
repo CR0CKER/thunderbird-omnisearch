@@ -104,6 +104,19 @@ one), and `accountId + headerMessageId` yields **51,520** distinct keys — the
 because it diffs on the stable key. It covers the one hole a date watermark
 cannot see: back-dated mail (an old `Date` header imported or moved in today).
 
+**It also runs once automatically, on migration.** A watermark assumes everything
+beneath it is complete, and an index written under the old keying violates
+exactly that: it can be missing months of mail while still holding a message from
+today, so the mark seeds near `now` and the catch-up steps over the hole. Every
+existing install carries such an index, so the fix must repair, not merely stop
+the bleeding. `SearchEngine.deserialize` therefore reports `migratedFromLegacyKey`,
+`background.js` persists a `pendingDeepSweep` flag in `storage.local` **before**
+sweeping, and `OmniEvents.deepSweepIfPending` clears it **only after**
+`reconcile()` resolves — an interrupted sweep (Thunderbird quits, the event page
+suspends mid-walk) stays pending and retries. It is triggered from three places
+so no install can miss it: when a load that set the flag settles, on
+`runtime.onStartup`, and on the daily alarm (ahead of the catch-up).
+
 ### 4. Migration: in place, no rebuild
 
 MiniSearch's inverted index references *internal* short ids; only `_documentIds`
@@ -134,6 +147,9 @@ Costs and risks:
   shows a folder the mail no longer occupies. Pinned by tests, red first.
 - Migration must be idempotent and crash-safe: a half-migrated snapshot must
   either load as `v:2` or as complete `v:3`, never as a mix.
+- The one-time repair sweep costs a full folder walk on the main thread, once per
+  upgraded install. That is the price of the old keying's damage, not of the new
+  design; it must never become recurring.
 - The watermark cannot see back-dated arrivals; that hole is explicitly assigned
   to the deep sweep rather than left implicit.
 - A periodic alarm does main-thread work. Cadence is bounded by the watermark

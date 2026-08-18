@@ -9,6 +9,7 @@
   let loaded = false;
   let loadPromise = null;
   let building = false;
+  let sweeping = false;
   let buildProgress = 0;
   let buildTotal = 0;
   let headerOnly = 0;
@@ -149,12 +150,22 @@
           headerOnly = r.headerOnly || 0;
           updatedAt = r.updatedAt;
           saveError = r.saveError || null;
+          // The index just came off the old numeric keying, so it may be missing
+          // mail that the broken reconcile could never restore. Record that a
+          // repair is owed BEFORE running it, so quitting mid-sweep resumes it.
+          if (r.rekeyed) await sweepState.mark();
         } catch (e) {
           console.error('[OmniSearch] index load failed:', e);
         } finally {
           loaded = true;
         }
       })();
+      // Kick the repair off as soon as the load settles — NOT awaited, and
+      // deliberately outside the load promise: deepSweepIfPending calls
+      // ensureLoaded itself, so awaiting it here would wait on this very
+      // promise. Without this, an index migrated by a popup-triggered load
+      // would sit unrepaired until the next daily alarm or restart.
+      loadPromise.then(() => void runDeepSweep());
     }
     return loadPromise;
   }
@@ -186,16 +197,67 @@
     },
   };
 
+  // Set when a legacy (numeric-keyed) index is migrated, cleared only once the
+  // repair sweep has actually finished. Persisted because the sweep must survive
+  // the event page suspending mid-walk — see OmniEvents.deepSweepIfPending.
+  const SWEEP_KEY = 'pendingDeepSweep';
+  const sweepState = {
+    async pending() {
+      try {
+        const r = await messenger.storage.local.get(SWEEP_KEY);
+        return !!(r && r[SWEEP_KEY]);
+      } catch (e) {
+        console.error('[OmniSearch] reading repair-sweep flag failed:', e);
+        return false;
+      }
+    },
+    async mark() {
+      try {
+        await messenger.storage.local.set({ [SWEEP_KEY]: true });
+      } catch (e) {
+        console.error('[OmniSearch] writing repair-sweep flag failed:', e);
+      }
+    },
+    async clear() {
+      try {
+        await messenger.storage.local.remove(SWEEP_KEY);
+      } catch (e) {
+        console.error('[OmniSearch] clearing repair-sweep flag failed:', e);
+      }
+    },
+  };
+
   const controller = {
     get engine() {
       return engineProxy;
     },
+    sweepState,
     // Live-update handlers await this before mutating: it guarantees the worker
     // has finished loading the persisted index before any incremental update is
     // sent, so updates can't be applied to an empty index that's about to load.
     ensureLoaded,
     watermarks,
   };
+
+  // One-time repair for an index migrated off the old numeric keying. That index
+  // may be missing mail from months back, which the watermark catch-up cannot
+  // see (it resumes from the newest message it holds and never looks beneath).
+  // Failure leaves the flag set, so the sweep retries rather than silently
+  // giving up on the mail it did not reach.
+  async function runDeepSweep() {
+    if (building || sweeping) return;
+    sweeping = true;
+    try {
+      const r = await OmniEvents.deepSweepIfPending(controller);
+      if (r && r.swept) {
+        console.info('[OmniSearch] repair sweep after migration: indexed', r.added, 'missing message(s), removed', r.removed);
+      }
+    } catch (e) {
+      console.error('[OmniSearch] repair sweep failed (will retry):', e);
+    } finally {
+      sweeping = false;
+    }
+  }
 
   // Pull anything the events missed. Never let it throw into a listener: a
   // failed catch-up must degrade to "index is behind", never to a broken
@@ -434,6 +496,7 @@
   safe('runtime.onStartup', () =>
     messenger.runtime.onStartup.addListener(async () => {
       await ensureLoaded();
+      await runDeepSweep();
       await runCatchUp('startup');
     }),
   );
@@ -451,7 +514,11 @@
   safe('alarms.onAlarm', () =>
     messenger.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === KEEPALIVE_ALARM) void ensureLoaded();
-      if (alarm.name === CATCHUP_ALARM) void runCatchUp('alarm');
+      if (alarm.name === CATCHUP_ALARM) {
+        // Repair first: until the migrated index is whole, the watermark it
+        // hands the catch-up describes an index with holes beneath it.
+        void runDeepSweep().then(() => runCatchUp('alarm'));
+      }
     }),
   );
   // In Spotlight mode the popup is cleared, so clicking the button (and the Alt+S

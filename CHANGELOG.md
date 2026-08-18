@@ -30,7 +30,10 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
     event now delays a message rather than hiding it permanently.
 
   Existing indexes are upgraded in place on first load — **no rebuild is
-  required**, and nothing needs to be re-read from your mail.
+  required**, and nothing needs to be re-read from your mail. Because an index
+  built by the previous version may already be missing mail, upgrading also runs
+  a one-time repair that finds and indexes whatever went missing; it resumes by
+  itself if Thunderbird is closed while it runs.
 
 ### Added
 
