@@ -382,3 +382,144 @@ test('search: an empty query with no filters still returns nothing', () => {
   assert.equal(r.results.length, 0);
   assert.equal(r.errors.length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Paging — total, offset windows, and the ceiling
+//
+// These replace the old hard 100-result cap. The cap was invisible: a search
+// matching 1,247 messages returned 100 and said nothing, so "is that all of
+// them?" had no answer. rank() now orders every match, page() serves windows of
+// it, and `total` states the real count.
+// ---------------------------------------------------------------------------
+
+// A ranked list of N synthetic records. page() is a pure slicer over whatever
+// rank() produced, so the ceiling and window arithmetic can be tested directly
+// without pushing thousands of documents through MiniSearch.
+const fakeRanked = (n) => Array.from({ length: n }, (_, i) => ({ id: String(i) }));
+
+test('rank: returns the complete ordered list, not a page', () => {
+  const engine = engineWith([
+    doc({ id: 'a', headerMessageId: '<a@x>', subject: 'release plan', date: NOW - days(3) }),
+    doc({ id: 'b', headerMessageId: '<b@x>', subject: 'release plan', date: NOW - days(2) }),
+    doc({ id: 'c', headerMessageId: '<c@x>', subject: 'release plan', date: NOW - days(1) }),
+  ]);
+  const r = engine.rank('release', { now: NOW });
+  assert.equal(r.ranked.length, 3);
+  assert.deepEqual(ids(r.ranked), ['c', 'b', 'a'], 'newest first — already recency-sorted');
+});
+
+test('search: total reports every match even when the page shows fewer', () => {
+  // The regression this guards: the old contract returned a bare truncated array,
+  // so a caller could not tell a complete 100 from a truncated 100.
+  const engine = engineWith([
+    doc({ id: 'a', headerMessageId: '<a@x>', subject: 'release plan', date: NOW - days(3) }),
+    doc({ id: 'b', headerMessageId: '<b@x>', subject: 'release plan', date: NOW - days(2) }),
+    doc({ id: 'c', headerMessageId: '<c@x>', subject: 'release plan', date: NOW - days(1) }),
+  ]);
+  const r = engine.search('release', 2, { now: NOW });
+  assert.equal(r.results.length, 2);
+  assert.equal(r.total, 3);
+  assert.equal(r.hasMore, true);
+});
+
+test('search: total counts unique messages, not raw label hits', () => {
+  // Three docs, two of them label copies of one message: the user is counting
+  // messages, so total must say 2 — the same collapse the page itself does.
+  const engine = engineWith([
+    doc({ id: '1', headerMessageId: '<same@x>', subject: 'travel receipt', folderName: 'All Mail' }),
+    doc({ id: '2', headerMessageId: '<same@x>', subject: 'travel receipt', folderName: 'Inbox' }),
+    doc({ id: '3', headerMessageId: '<other@x>', subject: 'travel receipt', folderName: 'Inbox' }),
+  ]);
+  const r = engine.search('receipt', 100, { now: NOW });
+  assert.equal(r.total, 2);
+  assert.equal(r.results.length, 2);
+});
+
+test('search: hasMore is false once the last result is on the page', () => {
+  const engine = engineWith([
+    doc({ id: 'a', headerMessageId: '<a@x>', subject: 'release plan' }),
+    doc({ id: 'b', headerMessageId: '<b@x>', subject: 'release plan' }),
+  ]);
+  const r = engine.search('release', 100, { now: NOW });
+  assert.equal(r.hasMore, false);
+  assert.equal(r.total, 2);
+});
+
+test('search: consecutive pages walk the ranked list with no gap or repeat', () => {
+  // The bug this pins: paging that re-ranks per request would re-run the recency
+  // curve against a newer `now` and could swap two results across the boundary,
+  // showing one message twice and hiding another. Pages must tile the list.
+  const engine = engineWith(
+    Array.from({ length: 7 }, (_, i) =>
+      doc({ id: `m${i}`, headerMessageId: `<m${i}@x>`, subject: 'release plan', date: NOW - days(i) }),
+    ),
+  );
+  const all = ids(engine.rank('release', { now: NOW }).ranked);
+  const p1 = engine.search('release', 3, { now: NOW, offset: 0 });
+  const p2 = engine.search('release', 3, { now: NOW, offset: 3 });
+  const p3 = engine.search('release', 3, { now: NOW, offset: 6 });
+  assert.deepEqual([...ids(p1.results), ...ids(p2.results), ...ids(p3.results)], all);
+  assert.deepEqual([p1.hasMore, p2.hasMore, p3.hasMore], [true, true, false]);
+  assert.deepEqual([p1.offset, p2.offset, p3.offset], [0, 3, 6]);
+});
+
+test('search: an offset past the end returns nothing but still reports the total', () => {
+  const engine = engineWith([doc({ id: 'a', headerMessageId: '<a@x>', subject: 'release plan' })]);
+  const r = engine.search('release', 100, { now: NOW, offset: 50 });
+  assert.equal(r.results.length, 0);
+  assert.equal(r.total, 1, 'the count is a property of the query, not of the page');
+  assert.equal(r.hasMore, false);
+});
+
+test('page: a negative or garbage offset is treated as the first page, never a tail slice', () => {
+  // slice(0, -5) silently drops the LAST five results instead of erroring, so an
+  // unvalidated offset would quietly show the worst matches. Clamp, don't trust.
+  const ranked = fakeRanked(10);
+  for (const bad of [-5, NaN, undefined, null, '3']) {
+    const r = OmniEngine.page(ranked, 4, bad);
+    assert.equal(r.offset, 0, `offset ${String(bad)} must clamp to 0`);
+    assert.deepEqual(Array.from(r.results, (x) => x.id), ['0', '1', '2', '3']);
+  }
+});
+
+test('page: a garbage limit falls back to the default page size, never an empty page', () => {
+  const ranked = fakeRanked(500);
+  for (const bad of [0, -1, NaN, null]) {
+    assert.equal(OmniEngine.page(ranked, bad).results.length, OmniEngine.DEFAULT_LIMIT);
+  }
+});
+
+test('page: paging cannot walk past MAX_RESULTS, and says so via capped', () => {
+  // The ceiling is a UI-thread protection, not a preference: prefix matching on
+  // one letter matches most of the archive, and every result crosses two
+  // structured-clone hops with the middle one on Thunderbird's main thread.
+  const MAX = OmniEngine.MAX_RESULTS;
+  const ranked = fakeRanked(MAX + 500);
+
+  const last = OmniEngine.page(ranked, 100, MAX - 100);
+  assert.equal(last.results.length, 100);
+  assert.equal(last.hasMore, false, 'at the ceiling there is no reachable next page');
+  assert.equal(last.capped, true);
+  assert.equal(last.total, MAX + 500, 'total stays honest about what actually matched');
+
+  // A large limit must not be able to straddle the ceiling.
+  const straddle = OmniEngine.page(ranked, 1000, MAX - 100);
+  assert.equal(straddle.results.length, 100);
+
+  const beyond = OmniEngine.page(ranked, 100, MAX + 100);
+  assert.equal(beyond.results.length, 0);
+});
+
+test('page: capped is false whenever the whole list is reachable', () => {
+  const r = OmniEngine.page(fakeRanked(OmniEngine.MAX_RESULTS), 100, 0);
+  assert.equal(r.capped, false);
+  assert.equal(r.hasMore, true);
+});
+
+test('search: a rejected date still reports a zero total alongside the error', () => {
+  const engine = engineWith(datedDocs());
+  const r = engine.search('budget date:7/6/2024', 100, { now: NOW });
+  assert.ok(r.errors.length > 0);
+  assert.equal(r.total, 0);
+  assert.equal(r.hasMore, false);
+});

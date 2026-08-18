@@ -361,3 +361,17 @@ li.result:focus {
 .folder { color: var(--accent); }
 
 .empty { padding: 24px 14px; color: var(--muted); text-align: center; }
+
+/* Result-list footer: the "showing 100 of 1,247" line, which doubles as the
+   scroll sentinel that pulls in the next page. It sits inside ul#results (the
+   existing scroll container) so it adds no height to the window's opening size,
+   and carries no `result` class or tabIndex so keyboard traversal skips it. */
+.results-meta {
+  padding: 10px 14px 14px;
+  color: var(--muted);
+  font-size: 0.85em;
+  text-align: center;
+  /* Not a row the user can act on — don't let it look like one. */
+  cursor: default;
+  user-select: none;
+}

@@ -89,6 +89,12 @@ mail. Click a chip's **×** to drop that filter and search again.
 - Each result shows the sender, date, folder(s), and a short preview. A small
   label marks messages indexed by header only (body not downloaded yet) or
   encrypted.
+- Tells you how many messages matched, not just the ones on screen. Results load
+  100 at a time and the next 100 arrive as you scroll, so a search matching
+  thousands of messages stays instant while still letting you reach any of them.
+  A line at the end of the list shows where you are ("Showing 100 of 1,247
+  matches"). Very large result sets stop at the first 5,000 — the line says so,
+  and adding a word or a `from:`/`date:` filter narrows it.
 
 **Two ways to search** (choose one in Settings)
 

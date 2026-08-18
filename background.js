@@ -67,11 +67,12 @@
   // Async stand-in for the old in-process SearchEngine. fullBuild/events talk to
   // this; each method updates the cached count from the worker's reply.
   const engineProxy = {
-    // Returns the engine's full { results, errors, filters, applied } reply, not just the
-    // hits: a rejected date operator has to reach the UI, or an unparseable
-    // query silently runs unfiltered and looks like it worked.
-    async search(query, limit) {
-      return await call('search', { query, limit });
+    // Returns the engine's full { results, total, offset, hasMore, capped, errors,
+    // filters, applied } reply, not just the hits: a rejected date operator has to
+    // reach the UI, or an unparseable query silently runs unfiltered and looks
+    // like it worked. `offset` pages an already-ranked list in the worker.
+    async search(query, limit, offset) {
+      return await call('search', { query, limit, offset });
     },
     async addAll(docs) {
       engineCount = (await call('addAll', { docs })).count;
@@ -190,10 +191,18 @@
       case 'search':
         await ensureLoaded();
         {
-          const r = await engineProxy.search(msg.query, msg.limit || 100);
+          const r = await engineProxy.search(msg.query, msg.limit || 100, msg.offset || 0);
           return {
             type: 'results',
             results: r.results,
+            // Paging metadata. `total` is the deduplicated match count, so the
+            // popup can say "showing 100 of 1,247" instead of silently
+            // truncating; hasMore/capped tell it whether scrolling further
+            // yields anything.
+            total: r.total || 0,
+            offset: r.offset || 0,
+            hasMore: !!r.hasMore,
+            capped: !!r.capped,
             errors: r.errors || [],
             filters: r.filters || null,
             applied: r.applied || [],

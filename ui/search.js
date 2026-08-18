@@ -372,10 +372,17 @@
     }
   }
 
-  function renderResults(results, query, errors, filters, applied, freeText) {
+  // Renders the FIRST page of a reply and (re)seeds the paging state. Takes the
+  // whole reply rather than seven positional fields — it now carries paging
+  // metadata (total/hasMore/capped) alongside the results and parse errors.
+  function renderResults(reply, query) {
+    const results = reply.results || [];
+    const { errors, filters, applied } = reply;
+    const freeText = reply.text || '';
     resultsEl.replaceChildren();
     emptyEl.replaceChildren();
-    renderChips(applied, freeText || '');
+    resetPaging();
+    renderChips(applied, freeText);
 
     // A rejected date operator MUST be shown. Dropping it silently would run an
     // unfiltered search that looks like it worked — exactly the failure the
@@ -401,74 +408,204 @@
       fitModalWindow();
       return;
     }
-    for (const r of results) {
-      const li = document.createElement('li');
-      li.className = 'result';
-      li.tabIndex = 0; // focusable for keyboard navigation
+    appendResults(results);
+    // The query these rows belong to. Paging must ask for more of THIS ranking,
+    // not of whatever is in the field by the time the user scrolls — the two
+    // diverge for the length of the 120ms debounce, and appending page 2 of a
+    // different query onto page 1 of this one is silent nonsense.
+    page.query = query;
+    page.shown = results.length;
+    page.total = reply.total || results.length;
+    page.hasMore = !!reply.hasMore;
+    page.capped = !!reply.capped;
+    renderResultsFooter();
+    fitModalWindow();
+  }
 
-      // Built entirely with DOM nodes + textContent, never innerHTML: result
-      // fields (subject/from/to/preview) come from email content and are therefore
-      // attacker-controlled. textContent cannot inject markup, so there is no HTML
-      // escaping to get right — and the addons-linter's "unsafe innerHTML" warning
-      // goes away because no markup string is ever assigned.
-      const subject = document.createElement('span');
-      subject.className = 'subject';
-      subject.textContent = r.subject || '(no subject)';
-      if (r.encrypted || !r.bodyAvailable) {
-        const badge = document.createElement('span');
-        badge.className = 'badge';
-        if (r.encrypted) {
-          badge.title = 'Encrypted message — indexed by subject/sender only';
-          badge.textContent = 'encrypted';
-        } else {
-          badge.title = 'Indexed by header only';
-          badge.textContent = 'header-only';
-        }
-        subject.appendChild(badge); // .badge margin-left provides the gap
+  // One result row. Extracted from renderResults so a paged-in batch builds
+  // identical rows without re-rendering the ones already on screen (and without
+  // dropping the keyboard focus that may be sitting on one of them).
+  function resultItem(r) {
+    const li = document.createElement('li');
+    li.className = 'result';
+    li.tabIndex = 0; // focusable for keyboard navigation
+
+    // Built entirely with DOM nodes + textContent, never innerHTML: result
+    // fields (subject/from/to/preview) come from email content and are therefore
+    // attacker-controlled. textContent cannot inject markup, so there is no HTML
+    // escaping to get right — and the addons-linter's "unsafe innerHTML" warning
+    // goes away because no markup string is ever assigned.
+    const subject = document.createElement('span');
+    subject.className = 'subject';
+    subject.textContent = r.subject || '(no subject)';
+    if (r.encrypted || !r.bodyAvailable) {
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      if (r.encrypted) {
+        badge.title = 'Encrypted message — indexed by subject/sender only';
+        badge.textContent = 'encrypted';
+      } else {
+        badge.title = 'Indexed by header only';
+        badge.textContent = 'header-only';
       }
-
-      const date = document.createElement('span');
-      date.className = 'date';
-      date.textContent = fmtDate(r.date);
-
-      const row = document.createElement('div');
-      row.className = 'row';
-      row.append(subject, date);
-
-      // A deduplicated result lists every folder the email appears in (e.g. a
-      // Gmail message in both Inbox and All Mail). Fall back to the single
-      // folderName for older result payloads.
-      const folders = (r.folders && r.folders.length ? r.folders : [r.folderName]).filter(Boolean);
-      const folder = document.createElement('span');
-      folder.className = 'folder';
-      folder.textContent = folders.join(' · ');
-
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.append(`${r.from} → ${r.to} · `, folder);
-
-      const preview = document.createElement('div');
-      preview.className = 'preview';
-      preview.textContent = r.preview;
-
-      li.append(row, meta, preview);
-      li.addEventListener('click', async () => {
-        // headerMessageId is the stable identity the background reopens by; the
-        // numeric id is only a hint (it changes across restarts). accountId
-        // disambiguates the same Message-ID appearing in two accounts.
-        await send({
-          type: 'open',
-          id: r.id,
-          headerMessageId: r.headerMessageId,
-          accountId: r.accountId,
-        });
-        // Close the popup once the message opens, unless the user opted to keep
-        // it open in settings.
-        const settings = await getSettings();
-        if (!settings.keepOpenAfterResult) window.close();
-      });
-      resultsEl.appendChild(li);
+      subject.appendChild(badge); // .badge margin-left provides the gap
     }
+
+    const date = document.createElement('span');
+    date.className = 'date';
+    date.textContent = fmtDate(r.date);
+
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.append(subject, date);
+
+    // A deduplicated result lists every folder the email appears in (e.g. a
+    // Gmail message in both Inbox and All Mail). Fall back to the single
+    // folderName for older result payloads.
+    const folders = (r.folders && r.folders.length ? r.folders : [r.folderName]).filter(Boolean);
+    const folder = document.createElement('span');
+    folder.className = 'folder';
+    folder.textContent = folders.join(' · ');
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.append(`${r.from} → ${r.to} · `, folder);
+
+    const preview = document.createElement('div');
+    preview.className = 'preview';
+    preview.textContent = r.preview;
+
+    li.append(row, meta, preview);
+    li.addEventListener('click', async () => {
+      // headerMessageId is the stable identity the background reopens by; the
+      // numeric id is only a hint (it changes across restarts). accountId
+      // disambiguates the same Message-ID appearing in two accounts.
+      await send({
+        type: 'open',
+        id: r.id,
+        headerMessageId: r.headerMessageId,
+        accountId: r.accountId,
+      });
+      // Close the popup once the message opens, unless the user opted to keep
+      // it open in settings.
+      const settings = await getSettings();
+      if (!settings.keepOpenAfterResult) window.close();
+    });
+    return li;
+  }
+
+  // Append a batch of results. The footer is re-appended after, so it stays last.
+  function appendResults(results) {
+    const frag = document.createDocumentFragment();
+    for (const r of results) frag.appendChild(resultItem(r));
+    resultsEl.appendChild(frag);
+  }
+
+  // ---- Paging -------------------------------------------------------------
+  // Results arrive one page at a time. The first page renders with the query;
+  // later pages are pulled in as the list is scrolled to its end, so a search
+  // that matches thousands of messages costs one page of DOM up front instead of
+  // thousands — while still letting the user reach any of them.
+  //
+  // `total` is what the old hard 100-cap hid: the count is now stated, so a
+  // truncated result set is visibly truncated rather than silently so.
+  const PAGE_SIZE = 100;
+  const emptyPage = () => ({ query: null, total: 0, shown: 0, hasMore: false, capped: false, loading: false, error: '' });
+  let page = emptyPage();
+
+  function resetPaging() {
+    page = emptyPage();
+    if (pageObserver) pageObserver.disconnect();
+  }
+
+  // The footer doubles as the scroll sentinel, which is why it is an <li> inside
+  // the list rather than a sibling: it lives in the existing scroll container
+  // (ul#results is overflow-y:auto in both the popup and the modal), so it needs
+  // no separate layout and adds no height to the window's opening size.
+  //
+  // It is deliberately absent when everything matched fits on one page — the
+  // common case is a handful of results, and a permanent count line there would
+  // add a row of height for information nobody asked for.
+  function renderResultsFooter() {
+    const existing = resultsEl.querySelector('li.results-meta');
+    if (existing) existing.remove();
+    if (pageObserver) pageObserver.disconnect();
+    if (!page.shown || (!page.hasMore && !page.error && page.shown >= page.total)) return;
+
+    const li = document.createElement('li');
+    // No `result` class and no tabIndex: keyboard navigation walks li.result,
+    // so the footer is skipped by Tab/arrow traversal rather than becoming a
+    // dead stop between the last result and the end of the list.
+    li.className = 'results-meta';
+    const n = (x) => x.toLocaleString();
+    if (page.error) {
+      li.textContent = page.error;
+    } else if (page.loading) {
+      li.textContent = 'Loading more…';
+    } else if (page.hasMore) {
+      li.textContent = `Showing ${n(page.shown)} of ${n(page.total)} matches — scroll for more`;
+    } else if (page.capped) {
+      // More matches exist than paging can reach. Say so plainly instead of
+      // implying the list is complete.
+      li.textContent = `Showing the top ${n(page.shown)} of ${n(page.total)} matches — narrow your search to see the rest`;
+    } else {
+      li.textContent = `All ${n(page.total)} matches shown`;
+    }
+    resultsEl.appendChild(li);
+    if (page.hasMore && !page.loading) observeFooter(li);
+  }
+
+  let pageObserver = null;
+  function observeFooter(el) {
+    if (!pageObserver) {
+      // rootMargin pulls the next page in just before the sentinel is actually
+      // reached, so scrolling stays continuous instead of stalling at the seam.
+      pageObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) void loadMore();
+        },
+        { root: resultsEl, rootMargin: '200px' },
+      );
+    }
+    pageObserver.observe(el);
+  }
+
+  async function loadMore() {
+    if (page.loading || !page.hasMore || page.query == null) return;
+    // The field has already moved on; the debounced search is about to replace
+    // this list wholesale, so paging it now would only append the wrong rows.
+    if (queryInput.value !== page.query) return;
+    page.loading = true;
+    const seq = searchSeq; // a newer keystroke invalidates this page
+    renderResultsFooter();
+    let reply;
+    try {
+      reply = await send({ type: 'search', query: page.query, limit: PAGE_SIZE, offset: page.shown });
+    } catch (e) {
+      page.loading = false;
+      page.hasMore = false; // stop retrying on every scroll event
+      // Say the page failed rather than falling through to "All N matches
+      // shown", which would claim the list is complete when it is not.
+      page.error = `Couldn't load more results — ${(e && e.message) || e}`;
+      renderResultsFooter();
+      return;
+    }
+    page.loading = false;
+    // Discard a page that arrived after the query moved on: its rows belong to
+    // a ranking the list on screen is no longer showing.
+    if (seq !== searchSeq) return;
+    if (reply && reply.type === 'results') {
+      appendResults(reply.results);
+      page.shown += reply.results.length;
+      page.total = reply.total || page.total;
+      // A page that comes back empty means the end, whatever hasMore claims —
+      // without this a truncated tail would loop the observer forever.
+      page.hasMore = !!reply.hasMore && reply.results.length > 0;
+      page.capped = !!reply.capped;
+    } else {
+      page.hasMore = false;
+    }
+    renderResultsFooter();
     fitModalWindow();
   }
 
@@ -483,14 +620,14 @@
     const seq = ++searchSeq;
     let reply;
     try {
-      reply = await send({ type: 'search', query });
+      reply = await send({ type: 'search', query, limit: PAGE_SIZE, offset: 0 });
     } catch (e) {
       statusEl.textContent = 'Search backend not responding — reload the add-on (Remove + Load again). ' + (e && e.message ? e.message : '');
       return;
     }
     if (seq !== searchSeq) return; // a newer keystroke superseded this one
     if (reply && reply.type === 'results') {
-      renderResults(reply.results, query, reply.errors, reply.filters, reply.applied, reply.text);
+      renderResults(reply, query);
     }
     else emptyEl.textContent = 'No response from the index.';
   }
