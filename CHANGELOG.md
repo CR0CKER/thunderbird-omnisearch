@@ -25,6 +25,10 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   or skip a message — the recency boost varies with time, so re-ranking per page
   would reorder results underneath the reader. `search()` remains as a one-shot
   wrapper.
+- The result footer's text is a pure function in `lib/results-summary.js`
+  (`OmniResults.footerText`), loaded by the popup and unit-tested, rather than
+  inline DOM code — it is a state machine, and the first cut of it made the
+  completed-paging message unreachable.
 
 ## [0.8.0] - 2026-08-18
 

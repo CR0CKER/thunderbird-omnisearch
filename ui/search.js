@@ -523,34 +523,26 @@
   // (ul#results is overflow-y:auto in both the popup and the modal), so it needs
   // no separate layout and adds no height to the window's opening size.
   //
-  // It is deliberately absent when everything matched fits on one page — the
-  // common case is a handful of results, and a permanent count line there would
-  // add a row of height for information nobody asked for.
+  // It is deliberately absent only when the whole result set arrived in the first
+  // page — the common case is a handful of results, and a permanent count line
+  // there would add a row of height for information nobody asked for. Once a
+  // search HAS been truncated, the line stays for good (ending on "All 1,247
+  // matches shown"), because the count is the thing the old hard cap hid.
   function renderResultsFooter() {
     const existing = resultsEl.querySelector('li.results-meta');
     if (existing) existing.remove();
     if (pageObserver) pageObserver.disconnect();
-    if (!page.shown || (!page.hasMore && !page.error && page.shown >= page.total)) return;
+    // Pure decision, unit-tested in test/results-summary.test.js — see the note
+    // in lib/results-summary.js for the bug that put it there.
+    const text = OmniResults.footerText(page, PAGE_SIZE);
+    if (text == null) return;
 
     const li = document.createElement('li');
     // No `result` class and no tabIndex: keyboard navigation walks li.result,
     // so the footer is skipped by Tab/arrow traversal rather than becoming a
     // dead stop between the last result and the end of the list.
     li.className = 'results-meta';
-    const n = (x) => x.toLocaleString();
-    if (page.error) {
-      li.textContent = page.error;
-    } else if (page.loading) {
-      li.textContent = 'Loading more…';
-    } else if (page.hasMore) {
-      li.textContent = `Showing ${n(page.shown)} of ${n(page.total)} matches — scroll for more`;
-    } else if (page.capped) {
-      // More matches exist than paging can reach. Say so plainly instead of
-      // implying the list is complete.
-      li.textContent = `Showing the top ${n(page.shown)} of ${n(page.total)} matches — narrow your search to see the rest`;
-    } else {
-      li.textContent = `All ${n(page.total)} matches shown`;
-    }
+    li.textContent = text;
     resultsEl.appendChild(li);
     if (page.hasMore && !page.loading) observeFooter(li);
   }
