@@ -29,6 +29,10 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   (`OmniResults.footerText`), loaded by the popup and unit-tested, rather than
   inline DOM code — it is a state machine, and the first cut of it made the
   completed-paging message unreachable.
+- The match count renders in `#resultsMeta`, a sibling of the result list rather
+  than a row inside it, with a separate invisible sentinel driving the scroll
+  trigger. Sharing one element made the count unreachable: nearing it loaded
+  another page and pushed it further down.
 
 ## [0.8.0] - 2026-08-18
 

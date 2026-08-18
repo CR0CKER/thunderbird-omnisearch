@@ -362,16 +362,30 @@ li.result:focus {
 
 .empty { padding: 24px 14px; color: var(--muted); text-align: center; }
 
-/* Result-list footer: the "showing 100 of 1,247" line, which doubles as the
-   scroll sentinel that pulls in the next page. It sits inside ul#results (the
-   existing scroll container) so it adds no height to the window's opening size,
-   and carries no `result` class or tabIndex so keyboard traversal skips it. */
+/* Match count, e.g. "Showing 300 of 22,596 matches". A sibling of ul#results,
+   NOT a row inside it: as a row it scrolled away with the list, and since it was
+   also the scroll sentinel, getting close enough to read it loaded another page
+   and pushed it a screenful further down. Outside the scroll container it simply
+   stays put. Empty collapses to nothing so it adds no height to the centered
+   window's opening size (same rule as .status/.empty/.chips). */
 .results-meta {
-  padding: 10px 14px 14px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 0.85em;
   text-align: center;
   /* Not a row the user can act on — don't let it look like one. */
   cursor: default;
   user-select: none;
+}
+.results-meta:empty { padding: 0; border-top: 0; }
+
+/* Zero-height marker at the end of the list that the IntersectionObserver
+   watches to pull in the next page. Invisible and unfocusable by design: it is
+   a trigger, not content. */
+.results-sentinel {
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  visibility: hidden;
 }

@@ -9,6 +9,7 @@
   const statusEl = $('status');
   const progressEl = $('progress');
   const emptyEl = $('empty');
+  const resultsMetaEl = $('resultsMeta');
   const chipsEl = $('chips');
   const loadingEl = $('loading');
 
@@ -381,6 +382,7 @@
     const freeText = reply.text || '';
     resultsEl.replaceChildren();
     emptyEl.replaceChildren();
+    resultsMetaEl.textContent = '';
     resetPaging();
     renderChips(applied, freeText);
 
@@ -494,8 +496,11 @@
     return li;
   }
 
-  // Append a batch of results. The footer is re-appended after, so it stays last.
+  // Append a batch of results. Any existing sentinel is dropped first so the new
+  // rows land at the end of the list; renderResultsFooter() re-creates it after.
   function appendResults(results) {
+    const stale = resultsEl.querySelector('li.results-sentinel');
+    if (stale) stale.remove();
     const frag = document.createDocumentFragment();
     for (const r of results) frag.appendChild(resultItem(r));
     resultsEl.appendChild(frag);
@@ -518,37 +523,47 @@
     if (pageObserver) pageObserver.disconnect();
   }
 
-  // The footer doubles as the scroll sentinel, which is why it is an <li> inside
-  // the list rather than a sibling: it lives in the existing scroll container
-  // (ul#results is overflow-y:auto in both the popup and the modal), so it needs
-  // no separate layout and adds no height to the window's opening size.
+  // The match count and the scroll trigger are TWO elements, and conflating them
+  // is the bug this shape exists to prevent.
   //
-  // It is deliberately absent only when the whole result set arrived in the first
-  // page — the common case is a handful of results, and a permanent count line
-  // there would add a row of height for information nobody asked for. Once a
-  // search HAS been truncated, the line stays for good (ending on "All 1,247
-  // matches shown"), because the count is the thing the old hard cap hid.
+  // The first version made the count line the last <li> of #results and observed
+  // that same element to trigger the next page. Those roles contradict each
+  // other: the sentinel must sit below the fold (touching it loads more), while
+  // the count must be permanently readable. So scrolling close enough to read
+  // "Showing 300 of 22,596" appended another hundred results and pushed the line
+  // a screenful further down — a treadmill the user could never win, and the
+  // count was reported as simply never appearing.
+  //
+  // Now: the count lives OUTSIDE the scroll container (#resultsMeta, a sibling of
+  // #results) so it stays put and updates in place, and the sentinel is a
+  // separate invisible zero-height <li> at the end of the list.
   function renderResultsFooter() {
-    const existing = resultsEl.querySelector('li.results-meta');
+    // Pure decision, unit-tested in test/results-summary.test.js — see the note
+    // in lib/results-summary.js for the bug that put it there. Empty string
+    // rather than a removed node, so .results-meta:empty collapses it.
+    const text = OmniResults.footerText(page, PAGE_SIZE);
+    resultsMetaEl.textContent = text == null ? '' : text;
+    syncSentinel();
+  }
+
+  function syncSentinel() {
+    const existing = resultsEl.querySelector('li.results-sentinel');
     if (existing) existing.remove();
     if (pageObserver) pageObserver.disconnect();
-    // Pure decision, unit-tested in test/results-summary.test.js — see the note
-    // in lib/results-summary.js for the bug that put it there.
-    const text = OmniResults.footerText(page, PAGE_SIZE);
-    if (text == null) return;
-
+    // Nothing left to fetch, or a fetch already in flight.
+    if (!page.hasMore || page.loading) return;
     const li = document.createElement('li');
-    // No `result` class and no tabIndex: keyboard navigation walks li.result,
-    // so the footer is skipped by Tab/arrow traversal rather than becoming a
-    // dead stop between the last result and the end of the list.
-    li.className = 'results-meta';
-    li.textContent = text;
+    // No `result` class and no tabIndex, so keyboard traversal
+    // (querySelectorAll('li.result')) walks straight past it; aria-hidden keeps
+    // it out of the accessibility tree since it is a trigger, not content.
+    li.className = 'results-sentinel';
+    li.setAttribute('aria-hidden', 'true');
     resultsEl.appendChild(li);
-    if (page.hasMore && !page.loading) observeFooter(li);
+    observeSentinel(li);
   }
 
   let pageObserver = null;
-  function observeFooter(el) {
+  function observeSentinel(el) {
     if (!pageObserver) {
       // rootMargin pulls the next page in just before the sentinel is actually
       // reached, so scrolling stays continuous instead of stalling at the seam.

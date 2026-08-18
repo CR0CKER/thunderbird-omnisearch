@@ -41,6 +41,12 @@
     <div id="chips" class="chips"></div>
 
     <ul id="results"></ul>
+    <!-- Match count ("Showing 300 of 22,596 matches"). Deliberately NOT inside
+         #results: it used to be the last <li>, doubling as the scroll sentinel,
+         and the two roles are incompatible — see syncSentinel() in search.js.
+         .results-meta:empty collapses so it adds no height to the centered
+         window's opening size. -->
+    <div id="resultsMeta" class="results-meta"></div>
     <div id="empty" class="empty"></div>
 
     <script src="../lib/results-summary.js"></script>
