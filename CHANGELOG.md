@@ -18,6 +18,19 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
   including your search words, is kept.
 - **A hint pointing at the filters**, shown when a search finds nothing — the
   moment you are most likely to want it. It stays out of the way otherwise.
+- **Filter suggestions in the search window.** While the search box is empty, the
+  line under it now offers the available filters — `from:`, `to:`, `date:`,
+  `after:`, `before:` — each with an example value, so you can see both that a
+  filter exists and what a valid value looks like. Click one to drop it into the
+  search box, then type the value. They disappear as soon as you start typing.
+
+### Changed
+
+- The search window no longer shows "X messages indexed · updated …". It was
+  read once and then ignored, while occupying the most visible line in the
+  window; the filter suggestions above use that space instead. The index count
+  and last-updated time are still on the Settings page, which is also where an
+  indexing problem is reported.
 
 ## [0.7.0] - 2026-08-07
 

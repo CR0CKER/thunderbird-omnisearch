@@ -131,11 +131,97 @@
         rebuildLink.addEventListener('click', () => void startRebuild());
         statusEl.append(rebuildLink, ' to index your mail.');
       } else {
-        const parts = [`${s.count.toLocaleString()} messages indexed`];
-        if (s.updatedAt) parts.push(`updated ${new Date(s.updatedAt).toLocaleTimeString()}`);
-        statusEl.textContent = parts.join(' · ');
+        // Ready. This row used to read "78,900 messages indexed · updated
+        // 15:00" — information you read once and then never again, occupying the
+        // most visible space in the window. The index count and freshness still
+        // live on the Settings page (options.js), which is also where a save
+        // error is reported, so nothing diagnostic is lost here.
+        //
+        // Filter templates go here instead. Reusing this existing row is what
+        // makes permanent discoverability affordable: the row is already part of
+        // the window's opening height, so nothing resizes on open — which is why
+        // the hint had to hide in the empty state before.
+        // Build once, not on every poll: refreshStatus() runs twice a second,
+        // and re-creating these buttons that often would rip focus away from a
+        // keyboard user who had tabbed onto one. Other states set textContent,
+        // which clears the row, so this rebuilds when returning from them.
+        if (!statusEl.querySelector('.templates')) {
+          statusEl.replaceChildren(renderFilterTemplates());
+        }
+        syncTemplateVisibility();
       }
     }
+  }
+
+  // Filter templates shown in the status row while the field is empty. Each is a
+  // button: clicking inserts the bare operator ("date:") and focuses the field
+  // so the user types the value. The example beside it is illustration, not
+  // inserted text — it is rendered muted precisely so it reads as "your value
+  // goes here" rather than as content.
+  //
+  // Examples deliberately show BOTH accepted date forms — year-first and a
+  // spelled month — because value format is where this feature has misled users
+  // repeatedly: knowing `date:` exists is useless if you then write 7/6/2024.
+  // The range form (date:A..B) is taught by the empty-state hint instead; it is
+  // too long to keep this row on one line, and the row must not wrap (see the
+  // .templates comment in search.css).
+  const FILTER_TEMPLATES = [
+    { op: 'from', example: 'alice' },
+    { op: 'to', example: 'bob' },
+    { op: 'date', example: '2024-06' },
+    { op: 'after', example: '2024-06' },
+    { op: 'before', example: '7 july 2024' },
+  ];
+
+  // Append "op:" to the query and put the caret after it, ready for a value.
+  function insertOperator(op) {
+    const current = queryInput.value.replace(/\s+$/, '');
+    queryInput.value = (current ? current + ' ' : '') + op + ':';
+    syncQueryUi();
+    queryInput.focus();
+    const end = queryInput.value.length;
+    queryInput.setSelectionRange(end, end);
+    // A bare "date:" resolves to no filter and no error (the parser treats a
+    // trailing incomplete value as still-being-typed), so this re-runs safely.
+    void runSearch();
+  }
+
+  function renderFilterTemplates() {
+    const row = document.createElement('div');
+    row.className = 'templates';
+    for (const { op, example } of FILTER_TEMPLATES) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'template-chip';
+      chip.title = `Add a ${op}: filter — for example ${op}:${example}`;
+      chip.setAttribute('aria-label', `Add ${op} filter, for example ${op} ${example}`);
+
+      const plus = document.createElement('span');
+      plus.className = 't-plus';
+      plus.textContent = '+';
+      plus.setAttribute('aria-hidden', 'true');
+
+      const name = document.createElement('span');
+      name.className = 't-op';
+      name.textContent = `${op}:`;
+
+      const eg = document.createElement('span');
+      eg.className = 't-example';
+      eg.textContent = example;
+
+      chip.append(plus, name, eg);
+      chip.addEventListener('click', () => insertOperator(op));
+      row.appendChild(chip);
+    }
+    return row;
+  }
+
+  // Templates are a cold-start affordance, not a permanent toolbar. They hide as
+  // soon as the field has text, which also keeps them from sitting directly
+  // above the ACTIVE filter chips — those look similar but mean the opposite
+  // (click to remove, not to add), and showing both at once invites misclicks.
+  function syncTemplateVisibility() {
+    statusEl.classList.toggle('has-query', queryInput.value.trim().length > 0);
   }
 
   // One-line pointer at the filter syntax, built from DOM nodes so the examples
@@ -192,7 +278,7 @@
   function removeFilter(applied, index, freeText) {
     const kept = applied.filter((_, i) => i !== index).map((a) => a.source);
     queryInput.value = [...kept, freeText].join(' ').trim();
-    clearBtn.hidden = queryInput.value.length === 0;
+    syncQueryUi();
     queryInput.focus();
     void runSearch();
   }
@@ -387,20 +473,25 @@
     }
   }
 
-  function syncClearButton() {
+  // Called by every path that changes the query text, so the chrome that depends
+  // on it stays in step: the clear button, and the filter templates (which hide
+  // once there is text). Folded into one function rather than remembered
+  // separately at each call site.
+  function syncQueryUi() {
     clearBtn.hidden = queryInput.value.length === 0;
+    syncTemplateVisibility();
   }
 
   let debounce;
   queryInput.addEventListener('input', () => {
-    syncClearButton();
+    syncQueryUi();
     if (debounce) clearTimeout(debounce);
     debounce = setTimeout(() => void runSearch(), 120);
   });
 
   clearBtn.addEventListener('click', () => {
     queryInput.value = '';
-    syncClearButton();
+    syncQueryUi();
     resultsEl.replaceChildren();
     emptyEl.replaceChildren();
     // Chips must go with the query that produced them — a chip left behind

@@ -153,6 +153,59 @@ button:hover { background: var(--hover); }
   padding: 0;
 }
 
+/* Filter templates, rendered inside the status row. Kept to a SINGLE line
+   (nowrap + hidden overflow): this row is part of the centered window's opening
+   height, so a wrapped second line would grow the window on open — the flicker
+   MODAL_MIN_H exists to prevent. Worst case on a narrow window the last chip is
+   clipped, which is harmless; a taller row is not. */
+.templates {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 6px;
+  align-items: center;
+}
+/* Hidden once the field has text — see syncTemplateVisibility(). The padding
+   goes too, so the row collapses completely rather than leaving a blank band. */
+.status.has-query { padding: 0; }
+.status.has-query .templates { display: none; }
+
+/* Deliberately NOT styled like an active filter chip. Those are solid with a
+   trailing x and mean "remove"; these are dashed with a leading + and mean
+   "add". Same shape, opposite action, so they must not look alike. */
+.template-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.template-chip:hover {
+  background: var(--chip-bg);
+  border-style: solid;
+  color: var(--fg);
+}
+.template-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.template-chip .t-plus { font-weight: 600; }
+/* The operator is what gets inserted, so it reads as literal text… */
+.template-chip .t-op {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--fg);
+}
+/* …while the example is only illustration and must not look insertable. */
+.template-chip .t-example {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.7;
+  font-style: italic;
+}
+
 /* Active filter chips. Each shows the RESOLVED meaning of a filter ("1 Jun –
    31 Jul 2024"), not the text the user typed, so an off-by-a-month range is
    visible before it silently returns the wrong mail. */
