@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses the `major.minor.patch` version in `manifest.json`.
 Changelog tracking begins at the 0.4.x series; for earlier history see the git log.
 
-## [Unreleased]
+## [0.9.0] - 2026-08-19
 
 ### Fixed
 
@@ -63,6 +63,20 @@ Changelog tracking begins at the 0.4.x series; for earlier history see the git l
 - The window no longer forces a full-list layout on every resize frame, which
   made dragging the centered window flicker on Linux once a few pages had been
   loaded.
+- Index documents are keyed on `accountId` + RFC Message-ID (`lib/dockey.js`,
+  shared by the background page and the engine worker) instead of the numeric
+  message id. Gmail/IMAP label copies therefore collapse into one document
+  carrying `folders[]`, so the query-time dedup pass in `rank()` is gone —
+  deduplication is now structural. On a reference profile the index went from
+  78,859 to 51,520 documents.
+- Snapshot format is `v:3`. A `v:2` snapshot is re-keyed in place on load
+  (MiniSearch's inverted index refers to documents by internal short ids, so this
+  rewrites one map) — no message is re-read and no rebuild is forced. The
+  accompanying one-time repair sweep is tied to leaving the numeric keying behind
+  and must not be re-triggered by future formats; see
+  `docs/adr/0001-stable-document-key-and-watermark-catchup.md`.
+- `docs/adr/` holds architecture decision records; 0001 covers the document key
+  and the pull-based freshness model.
 
 ## [0.8.0] - 2026-08-18
 

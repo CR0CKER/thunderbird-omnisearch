@@ -113,9 +113,15 @@ keep it open.
 
 - Updates the index automatically as mail arrives or is moved, copied, edited, or
   deleted.
+- Also checks for anything those live updates missed — when Thunderbird starts,
+  and once a day after that. Mail that arrived while Thunderbird was closed, mail
+  filed straight into a folder by a server-side rule, and mail you sent do not
+  always announce themselves, so OmniSearch asks for anything newer than the last
+  message it indexed rather than waiting to be told.
 - "Verify and repair" re-checks every folder against the index, removing stale
-  entries and adding anything missing, so a message can never stay permanently
-  hidden from search.
+  entries and adding anything missing — a deeper check for the rare case the
+  daily one cannot see, such as old mail imported or moved in with an original
+  date far in the past.
 - The index is saved to disk, so it is ready almost instantly after you restart
   Thunderbird rather than being rebuilt every time.
 

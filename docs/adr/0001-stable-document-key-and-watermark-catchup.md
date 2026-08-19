@@ -150,6 +150,18 @@ Costs and risks:
 - The one-time repair sweep costs a full folder walk on the main thread, once per
   upgraded install. That is the price of the old keying's damage, not of the new
   design; it must never become recurring.
+
+  **Rule for future releases: nothing after the `v:3` release may re-trigger the
+  migration or the repair sweep.** The whole chain hangs off one condition —
+  `legacyKey = !(data.v >= 3)` in `deserialize` — which sets
+  `migratedFromLegacyKey`, which makes the worker report `rekeyed`, which makes
+  `background.js` mark `pendingDeepSweep`. A later snapshot format (`v:4` and on)
+  must therefore introduce its **own** migration path and leave that flag alone:
+  the sweep exists to repair mail lost by the *numeric-id keying specifically*,
+  not to accompany format changes in general. Re-running it would put every user
+  through a full folder walk on every release for nothing.
+  `test/migrate.test.js` pins both directions — a `v:3` index reports no
+  migration, a `v:2` index still does.
 - The watermark cannot see back-dated arrivals; that hole is explicitly assigned
   to the deep sweep rather than left implicit.
 - A periodic alarm does main-thread work. Cadence is bounded by the watermark
