@@ -141,3 +141,35 @@ test('a migrated snapshot round-trips without migrating twice', () => {
   assert.deepEqual([...hit.folders].sort(), ['All Mail', 'Inbox'], 'folders must not be lost or duplicated on reload');
   assert.equal(twice.size, 1);
 });
+
+// The repair sweep is a ONE-TIME event, tied to leaving the broken keying
+// behind. Once an index is v:3 it must never migrate again — a repeat would
+// re-run the full-folder-walk repair sweep on every user, every release, for no
+// reason. The whole chain hangs off one condition (`data.v >= 3` in
+// deserialize), so these pin both sides of it.
+
+test('a v:3 index does not migrate again, so the repair sweep never repeats', () => {
+  const migrated = OmniEngine.deserialize(v2Snapshot([v2Doc()]));
+  const reloaded = OmniEngine.deserialize(migrated.toData());
+
+  assert.equal(
+    reloaded.migratedFromLegacyKey,
+    false,
+    'a v:3 snapshot must not be treated as legacy — that would re-trigger the ' +
+      'one-time repair sweep for every user on every release',
+  );
+});
+
+test('a v:2 index does report that it migrated, so the repair runs once', () => {
+  // The positive control for the test above: if this ever stops being true, the
+  // repair silently never runs and upgraded users keep their missing mail.
+  const migrated = OmniEngine.deserialize(v2Snapshot([v2Doc()]));
+  assert.equal(migrated.migratedFromLegacyKey, true);
+});
+
+test('an empty legacy index reports nothing to repair', () => {
+  // Nothing was ever indexed, so there is nothing that went missing; a fresh
+  // install must not pay for a full folder walk it cannot benefit from.
+  const empty = OmniEngine.deserialize(v2Snapshot([]));
+  assert.equal(empty.migratedFromLegacyKey, false);
+});
