@@ -85,7 +85,8 @@ header {
 }
 .clear:hover { background: var(--hover); color: var(--fg); }
 
-.actions { display: flex; gap: 6px; }
+.actions { display: flex; gap: 6px; align-items: center; }
+.sort-controls { display: flex; gap: 4px; align-items: center; }
 button {
   padding: 8px 12px;
   font-size: 13px;
@@ -361,6 +362,34 @@ li.result:focus {
 .folder { color: var(--accent); }
 
 .empty { padding: 24px 14px; color: var(--muted); text-align: center; }
+
+/* Sort label and dropdown in the actions bar */
+.sort-label {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+#sort {
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+#sort:focus { outline: 2px solid var(--accent); }
+
+/* Relevance score and date grouped in the result row's right side */
+.date-score { display: flex; align-items: center; gap: 6px; flex: none; }
+.score {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+}
 
 /* Match count, e.g. "Showing 300 of 22,596 matches". A sibling of ul#results,
    NOT a row inside it: as a row it scrolled away with the list, and since it was

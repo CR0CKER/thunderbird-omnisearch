@@ -72,8 +72,8 @@
     // filters, applied } reply, not just the hits: a rejected date operator has to
     // reach the UI, or an unparseable query silently runs unfiltered and looks
     // like it worked. `offset` pages an already-ranked list in the worker.
-    async search(query, limit, offset) {
-      return await call('search', { query, limit, offset });
+    async search(query, limit, offset, sort) {
+      return await call('search', { query, limit, offset, sort });
     },
     async addAll(docs) {
       engineCount = (await call('addAll', { docs })).count;
@@ -303,7 +303,7 @@
       case 'search':
         await ensureLoaded();
         {
-          const r = await engineProxy.search(msg.query, msg.limit || 100, msg.offset || 0);
+          const r = await engineProxy.search(msg.query, msg.limit || 100, msg.offset || 0, msg.sort || null);
           return {
             type: 'results',
             results: r.results,
