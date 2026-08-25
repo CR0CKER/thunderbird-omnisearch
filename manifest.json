@@ -29,6 +29,7 @@
     ]
   },
   "action": {
+    "allowed_spaces": [],
     "default_title": "OmniSearch",
     "default_popup": "ui/search.html",
     "default_icon": "icons/search.svg"

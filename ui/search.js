@@ -18,6 +18,7 @@
   // Escape-to-close and self-resizing so the window grows from just the search
   // field to fit results. The <html> also carries class "modal" for layout.
   const isModal = location.hash === '#modal';
+  const isTab = location.hash === '#tab';
   let modalWinId = null;
   // The window's opening height. Must track SPOTLIGHT_H in background.js. The
   // window never shrinks below this, so the empty/loading state never triggers a
@@ -404,6 +405,7 @@
   // claims results that are no longer on screen. Esc-to-clear routes through
   // here, which is what makes the count vanish with everything else.
   function clearResultsView() {
+    if (isTab) document.title = 'OmniSearch';
     resultsEl.replaceChildren();
     emptyEl.replaceChildren();
     resultsMetaEl.textContent = '';
@@ -525,7 +527,7 @@
       // Close the popup once the message opens, unless the user opted to keep
       // it open in settings.
       const settings = await getSettings();
-      if (!settings.keepOpenAfterResult) window.close();
+      if (!isTab && !settings.keepOpenAfterResult) window.close();
     });
     return li;
   }
@@ -671,6 +673,10 @@
       renderResults(reply, query);
     }
     else emptyEl.textContent = 'No response from the index.';
+    if (isTab) {
+      const trimmed = query.trim();
+      document.title = trimmed ? `OmniSearch: ${trimmed}` : 'OmniSearch';
+    }
   }
 
   // Kick off a full index build from the empty-state "Rebuild" link. The
@@ -791,11 +797,12 @@
   // Close the search window once Settings opens so it doesn't linger over the
   // options tab. (The toolbar popup would close on blur anyway; the centered
   // window must close itself.) Await the open first so closing doesn't abort it.
+  // In tab mode the search tab should stay open.
   $('settings').addEventListener('click', async () => {
     try {
       await messenger.runtime.openOptionsPage();
     } finally {
-      window.close();
+      if (!isTab) window.close();
     }
   });
 
@@ -841,6 +848,11 @@
     // Dismiss with Escape or by opening a result. (We deliberately do NOT close
     // on window blur: GNOME/Wayland fires a blur when you start dragging the
     // window, which made it vanish mid-move.)
+  }
+
+  if (isTab) {
+    // Full-width layout for the tab context (same approach as #modal).
+    document.documentElement.classList.add('tab');
   }
 
   // Show the (non-blocking) loading hint until the first status reply. The field

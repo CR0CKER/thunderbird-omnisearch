@@ -7,6 +7,7 @@
   const keepWarm = document.getElementById('keepWarm');
   const searchUIPopup = document.getElementById('searchUIPopup');
   const searchUISpotlight = document.getElementById('searchUISpotlight');
+  const searchUITab = document.getElementById('searchUITab');
   const includeSpamTrash = document.getElementById('includeSpamTrash');
   const indexEncryptedBodies = document.getElementById('indexEncryptedBodies');
   const bodyIndexLimit = document.getElementById('bodyIndexLimit');
@@ -80,10 +81,9 @@
     const settings = await getSettings();
     keepOpen.checked = !!settings.keepOpenAfterResult;
     keepWarm.checked = !!settings.keepWarm;
-    // Spotlight (centered window) is the default; only an explicit 'popup' opts out.
-    const popup = settings.searchUI === 'popup';
-    searchUIPopup.checked = popup;
-    searchUISpotlight.checked = !popup;
+    searchUIPopup.checked = settings.searchUI === 'popup';
+    searchUITab.checked = settings.searchUI === 'tab';
+    searchUISpotlight.checked = !settings.searchUI || settings.searchUI === 'spotlight';
     includeSpamTrash.checked = !!settings.includeSpamTrash;
     indexEncryptedBodies.checked = !!settings.indexEncryptedBodies;
     bodyIndexLimit.value = String(settings.bodyIndexLimit || 4000);
@@ -97,13 +97,16 @@
 
   async function saveSearchUI() {
     const settings = await getSettings();
-    settings.searchUI = searchUISpotlight.checked ? 'spotlight' : 'popup';
+    if (searchUIPopup.checked) settings.searchUI = 'popup';
+    else if (searchUITab.checked) settings.searchUI = 'tab';
+    else settings.searchUI = 'spotlight';
     // The background watches storage.onChanged and flips the toolbar button /
-    // shortcut between the anchored popup and the Spotlight window itself.
+    // shortcut between the anchored popup and the Spotlight/Tab modes itself.
     await messenger.storage.local.set({ [KEY]: settings });
   }
   searchUIPopup.addEventListener('change', saveSearchUI);
   searchUISpotlight.addEventListener('change', saveSearchUI);
+  searchUITab.addEventListener('change', saveSearchUI);
 
   keepWarm.addEventListener('change', async () => {
     const settings = await getSettings();

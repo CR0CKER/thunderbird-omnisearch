@@ -389,3 +389,8 @@ li.result:focus {
   padding: 0;
   visibility: hidden;
 }
+
+/* Tab mode: full-width layout, and let results grow naturally without a fixed
+   height cap — the tab itself scrolls. */
+html.tab body { width: 100%; }
+html.tab ul#results { max-height: none; }
