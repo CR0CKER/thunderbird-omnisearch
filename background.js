@@ -90,6 +90,12 @@
     async hasKey(key) {
       return (await call('hasKey', { key })).has;
     },
+    async pendingAttachmentChecks() {
+      return (await call('pendingAttachmentChecks')).items;
+    },
+    async setAttachmentInfo(key, hasAttachment, attachmentNames) {
+      engineCount = (await call('setAttachmentInfo', { key, hasAttachment, attachmentNames })).count;
+    },
     async maxDate(accountId) {
       return (await call('maxDate', { accountId })).date;
     },
@@ -339,7 +345,12 @@
         return { type: 'status', status: status() };
       case 'reconcile':
         await ensureLoaded();
-        await OmniEvents.reconcile(controller);
+        {
+          const r = await OmniEvents.reconcile(controller);
+          if (r.attachmentsRepaired) {
+            console.info('[OmniSearch] Verify & repair: filled in attachment info for', r.attachmentsRepaired, 'message(s)');
+          }
+        }
         return { type: 'status', status: status() };
       case 'catchUp':
         await ensureLoaded();

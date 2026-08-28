@@ -102,13 +102,42 @@ function makeWorld({ live, indexed }) {
       async removeFromFolder(k) {
         store.delete(k);
       },
+      // Attachment repair is a no-op unless a fixture explicitly gives a doc
+      // `hasAttachment: null` (the v:3->v:4 "not yet checked" placeholder) —
+      // none of these fixtures do, so this stays a quiet, empty pass.
+      async pendingAttachmentChecks() {
+        return [...store.values()]
+          .filter((d) => d.hasAttachment === null)
+          .map((d) => ({ key: key(d), id: d.id, headerMessageId: d.headerMessageId, accountId: d.accountId }));
+      },
+      async setAttachmentInfo(k, hasAttachment, attachmentNames) {
+        const d = store.get(k);
+        if (d) Object.assign(d, { hasAttachment, attachmentNames });
+      },
     },
   };
 
   const indexedMessageIds = () =>
     new Set([...store.values()].map((d) => d.headerMessageId));
 
-  return { messenger, OmniIndexer, ctrl, indexedMessageIds };
+  // Resolves by numeric id first (like the real lib/open.js), falling back to
+  // the stable Message-ID — the same two-step lookup reconcile's own repair
+  // pass depends on to avoid reading the WRONG (id-recycled) message.
+  const OmniOpen = {
+    async resolveMessageId(doc) {
+      const cached = Number(doc.id);
+      if (Number.isFinite(cached) && liveMap.has(String(cached))) {
+        const live = liveMap.get(String(cached));
+        if (!doc.headerMessageId || live.headerMessageId === doc.headerMessageId) return cached;
+      }
+      for (const m of liveMap.values()) {
+        if (m.headerMessageId === doc.headerMessageId) return m.id;
+      }
+      return null;
+    },
+  };
+
+  return { messenger, OmniIndexer, OmniOpen, ctrl, indexedMessageIds };
 }
 
 test('reconcile indexes a message the events missed', async () => {
@@ -123,6 +152,7 @@ test('reconcile indexes a message the events missed', async () => {
   const { OmniEvents } = loadOmniEvents({
     messenger: world.messenger,
     OmniIndexer: world.OmniIndexer,
+    OmniOpen: world.OmniOpen,
   });
 
   await OmniEvents.reconcile(world.ctrl);
@@ -147,6 +177,7 @@ test('reconcile indexes a missed message whose numeric id was reused after a res
   const { OmniEvents } = loadOmniEvents({
     messenger: world.messenger,
     OmniIndexer: world.OmniIndexer,
+    OmniOpen: world.OmniOpen,
   });
 
   await OmniEvents.reconcile(world.ctrl);
@@ -437,6 +468,7 @@ test('a migrated index gets one deep sweep, which finds what the watermark canno
   const { OmniEvents } = loadOmniEvents({
     messenger: world.messenger,
     OmniIndexer: world.OmniIndexer,
+    OmniOpen: world.OmniOpen,
   });
 
   const r = await OmniEvents.deepSweepIfPending(world.ctrl);
@@ -454,6 +486,7 @@ test('an index that never needed the sweep does not pay for one', async () => {
   const { OmniEvents } = loadOmniEvents({
     messenger: world.messenger,
     OmniIndexer: world.OmniIndexer,
+    OmniOpen: world.OmniOpen,
   });
 
   const r = await OmniEvents.deepSweepIfPending(world.ctrl);
@@ -469,6 +502,7 @@ test('an interrupted sweep stays pending and runs again', async () => {
   const { OmniEvents } = loadOmniEvents({
     messenger: world.messenger,
     OmniIndexer: world.OmniIndexer,
+    OmniOpen: world.OmniOpen,
   });
 
   await assert.rejects(() => OmniEvents.deepSweepIfPending(world.ctrl));
