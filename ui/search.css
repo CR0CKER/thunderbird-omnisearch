@@ -155,17 +155,39 @@ button:hover { background: var(--hover); }
   padding: 0;
 }
 
-/* Filter templates, rendered inside the status row. Kept to a SINGLE line
-   (nowrap + hidden overflow): this row is part of the centered window's opening
-   height, so a wrapped second line would grow the window on open — the flicker
-   MODAL_MIN_H exists to prevent. Worst case on a narrow window the last chip is
-   clipped, which is harmless; a taller row is not. */
+/* Filter templates, rendered inside the status row. Kept to a SINGLE line: this
+   row is part of the centered window's opening height, so a wrapped second line
+   would grow the window on open — the flicker MODAL_MIN_H exists to prevent.
+   Overflow scrolls horizontally instead of clipping, so a narrow window can
+   still reach every template. The scrollbar is invisible at rest and only
+   tints in (as a thin, theme-coloured sliver) while hovering/scrolling, so it
+   doesn't sit there as visual clutter. */
 .templates {
   display: flex;
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   gap: 6px;
   align-items: center;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  /* Gap between the chips and the scrollbar below them; the negative margin
+     cancels the added padding so the row's outer height is unchanged. */
+  padding-bottom: 5px;
+  margin-bottom: -5px;
+}
+.templates:hover,
+.templates:focus-within {
+  scrollbar-color: var(--border) transparent;
+}
+.templates::-webkit-scrollbar { height: 4px; }
+.templates::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+.templates:hover::-webkit-scrollbar-thumb,
+.templates:focus-within::-webkit-scrollbar-thumb {
+  background: var(--border);
 }
 /* Hidden once the field has text — see syncTemplateVisibility(). The padding
    goes too, so the row collapses completely rather than leaving a blank band. */
@@ -361,6 +383,15 @@ li.result:focus {
 .folder { color: var(--accent); }
 
 .empty { padding: 24px 14px; color: var(--muted); text-align: center; }
+
+.badges { display: flex; align-items: flex-start; gap: 6px; flex: none; }
+.badges .has-attachments {
+  display: inline-flex;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.badges svg { display: block; }
 
 /* Match count, e.g. "Showing 300 of 22,596 matches". A sibling of ul#results,
    NOT a row inside it: as a row it scrolled away with the list, and since it was

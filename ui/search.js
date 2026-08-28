@@ -235,6 +235,8 @@
     { op: 'date', example: '2024-06' },
     { op: 'after', example: '2024-06' },
     { op: 'before', example: '7 july 2024' },
+    { op: 'file', example: 'report.pdf' },
+    { op: 'hasattachment', example: 'yes' },
   ];
 
   // Append "op:" to the query and put the caret after it, ready for a value.
@@ -316,6 +318,8 @@
     if (filters.after != null && filters.before != null) parts.push(`between ${d(filters.after)} and ${d(filters.before)}`);
     else if (filters.after != null) parts.push(`on or after ${d(filters.after)}`);
     else if (filters.before != null) parts.push(`on or before ${d(filters.before)}`);
+    if (filters.file) parts.push(`with a file named ${filters.file}`);
+    if (filters.hasAttachment != null) parts.push(filters.hasAttachment ? 'with an attachment' : 'without an attachment');
     return parts.join(', ');
   }
 
@@ -324,7 +328,8 @@
   // A range that came out a month wider than intended is then visible before it
   // quietly returns the wrong mail.
   function chipLabel(entry) {
-    if (entry.op === 'from' || entry.op === 'to') return `${entry.op}: ${entry.value}`;
+    if (entry.op === 'from' || entry.op === 'to' || entry.op === 'file') return `${entry.op}: ${entry.value}`;
+    if (entry.op === 'hasattachment') return entry.value ? 'has attachment' : 'no attachment';
     const d = (ms) => new Date(ms).toLocaleDateString();
     if (entry.after != null && entry.before != null) {
       // A single day resolves to the same date at both ends; say it once.
@@ -352,6 +357,10 @@
     path.setAttribute('stroke-linecap', 'round');
     svg.appendChild(path);
     return svg;
+  }
+
+  function attachmentIconHTML() {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m21.153 10.9-9.016 9.015a5.25 5.25 0 0 1-7.425-7.425l9.016-9.015a3.5 3.5 0 1 1 4.95 4.95l-8.662 8.662a1.75 1.75 0 1 1-2.475-2.475l7.601-7.602" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
   // Rebuild the query from the chips the user kept, plus the leftover free
@@ -491,9 +500,23 @@
     date.className = 'date';
     date.textContent = fmtDate(r.date);
 
+    const badges = document.createElement('span');
+    badges.className = 'badges';
+
+    if(r.attachmentNames && r.attachmentNames.length > 0) {
+      let count = r.attachmentNames.length;
+      const attachments = document.createElement('span');
+      attachments.className = 'has-attachments';
+      attachments.title = `Has ${count} attachment${count > 1 ? 's' : ''}`;
+      attachments.innerHTML = attachmentIconHTML();
+      badges.append(attachments);
+    }
+
+    badges.append(date);
+
     const row = document.createElement('div');
     row.className = 'row';
-    row.append(subject, date);
+    row.append(subject, badges);
 
     // A deduplicated result lists every folder the email appears in (e.g. a
     // Gmail message in both Inbox and All Mail). Fall back to the single

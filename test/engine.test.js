@@ -314,6 +314,32 @@ test('search: from: finds a bare address the tokenizer mangles', () => {
   assert.deepEqual(found, ['b']);
 });
 
+test('search: hasattachment:yes/no filters on the stored boolean', () => {
+  const docs = [
+    doc({ id: 'with', headerMessageId: '<w@x>', subject: 'report', hasAttachment: true }),
+    doc({ id: 'without', headerMessageId: '<n@x>', subject: 'report', hasAttachment: false }),
+  ];
+  const withAttachment = ids(engineWith(docs).search('report hasattachment:yes', 100, { now: NOW }).results);
+  assert.deepEqual(withAttachment, ['with']);
+  const withoutAttachment = ids(engineWith(docs).search('report hasattachment:no', 100, { now: NOW }).results);
+  assert.deepEqual(withoutAttachment, ['without']);
+});
+
+test('search: file: matches an attachment name, case-insensitively', () => {
+  const docs = [
+    doc({ id: 'pdf', headerMessageId: '<p@x>', subject: 'report', hasAttachment: true, attachmentNames: ['Invoice.PDF'] }),
+    doc({ id: 'none', headerMessageId: '<q@x>', subject: 'report', hasAttachment: false, attachmentNames: [] }),
+  ];
+  const found = ids(engineWith(docs).search('report file:invoice', 100, { now: NOW }).results);
+  assert.deepEqual(found, ['pdf']);
+});
+
+test('search: an attachment file name is also searchable as plain text', () => {
+  const docs = [doc({ id: 'pdf', headerMessageId: '<p@x>', subject: 'report', hasAttachment: true, attachmentNames: ['annualreport.pdf'] })];
+  const found = ids(engineWith(docs).search('annualreport', 100, { now: NOW }).results);
+  assert.deepEqual(found, ['pdf']);
+});
+
 test('search: the full target query — sender plus date range', () => {
   const docs = [
     doc({ id: 'hit', headerMessageId: '<1@x>', subject: 'invoice', from: 'alice@corp.com', date: june2024() }),

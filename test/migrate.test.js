@@ -124,9 +124,9 @@ test('migration collapses label copies and merges their folders', () => {
   assert.equal(engine.size, 2, 'two label copies of one message must migrate to one document');
 });
 
-test('migration re-serializes as v:3', () => {
+test('migration re-serializes as the current format version', () => {
   const engine = OmniEngine.deserialize(v2Snapshot([v2Doc()]));
-  assert.equal(engine.toData().v, 3);
+  assert.equal(engine.toData().v, 4);
 });
 
 test('a migrated snapshot round-trips without migrating twice', () => {
@@ -172,4 +172,127 @@ test('an empty legacy index reports nothing to repair', () => {
   // install must not pay for a full folder walk it cannot benefit from.
   const empty = OmniEngine.deserialize(v2Snapshot([]));
   assert.equal(empty.migratedFromLegacyKey, false);
+});
+
+// ---------------------------------------------------------------------------
+// v:3 -> v:4 — adds hasAttachment/attachmentNames. Unlike the v2->v3 key
+// migration, no mail is missing here: a v:3 doc simply lacks two FIELDS, so
+// this is a plain backfill (no deep sweep, no repair flag) rather than a
+// repair for a structural bug.
+// ---------------------------------------------------------------------------
+
+// The pre-v:4 index shape: stable key, folders[], but no attachment fields at
+// all — those were added by this change.
+const V3_OPTIONS = {
+  idField: 'key',
+  fields: ['subject', 'from', 'to', 'body'],
+  storeFields: [
+    'key', 'id', 'subject', 'from', 'to', 'date', 'folders', 'accountId',
+    'preview', 'bodyAvailable', 'headerMessageId', 'encrypted',
+  ],
+};
+
+function v3Doc(over = {}) {
+  return Object.assign(
+    {
+      key: OmniEngine.docKey({ accountId: 'account1', headerMessageId: 'mesh@mail.gmail.com' }),
+      id: '101',
+      accountId: 'account1',
+      headerMessageId: 'mesh@mail.gmail.com',
+      subject: 'Re: API beta access request',
+      from: '"Mesh Team (Mesh)" <care@clay.earth>',
+      to: 'Nils <nils@example.com>',
+      body: 'thanks for asking about the beta',
+      date: Date.UTC(2026, 7, 17),
+      folders: ['Archive'],
+      preview: 'thanks for asking about the beta',
+      bodyAvailable: true,
+      encrypted: false,
+    },
+    over,
+  );
+}
+
+// Mirrors the old (pre-attachment-fields) SearchEngine.toData(), format v:3.
+function v3Snapshot(docs) {
+  const mini = new MiniSearch(V3_OPTIONS);
+  mini.addAll(docs);
+  return {
+    v: 3,
+    mini: {
+      documentCount: mini._documentCount,
+      nextId: mini._nextId,
+      fieldIds: mini._fieldIds,
+      averageFieldLength: mini._avgFieldLength,
+      dirtCount: mini._dirtCount,
+      documentIds: mini._documentIds,
+      fieldLength: mini._fieldLength,
+      storedFields: mini._storedFields,
+      indexTree: mini._index._tree,
+    },
+    ids: new Set(docs.map((d) => d.key)),
+  };
+}
+
+test('a v:3 snapshot still loads and its mail is still findable', () => {
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc()]));
+  const { ranked } = engine.rank('beta');
+  assert.equal(ranked.length, 1, 'an existing v:3 index must keep working across the upgrade');
+});
+
+test('v:3 -> v:4 marks hasAttachment/attachmentNames as null — "not yet checked", not "none"', () => {
+  // null must be distinct from a real false/[]: those would claim a definite
+  // answer for mail nobody has actually looked at, which "Verify & repair"
+  // could then never tell apart from a message that genuinely has no
+  // attachments.
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc()]));
+  const hit = engine.rank('beta').ranked[0];
+  assert.equal(hit.hasAttachment, null);
+  assert.equal(hit.attachmentNames, null);
+});
+
+test('a backfilled doc surfaces in pendingAttachmentChecks, ready for Verify & repair', () => {
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc()]));
+  const pending = engine.pendingAttachmentChecks();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].headerMessageId, 'mesh@mail.gmail.com');
+  assert.equal(pending[0].accountId, 'account1');
+});
+
+test('setAttachmentInfo answers the pending check and removes the doc from the list', () => {
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc()]));
+  const [{ key }] = engine.pendingAttachmentChecks();
+  engine.setAttachmentInfo(key, true, ['invoice.pdf']);
+
+  const hit = engine.rank('beta').ranked[0];
+  assert.equal(hit.hasAttachment, true);
+  assert.deepEqual(Array.from(hit.attachmentNames), ['invoice.pdf']);
+  assert.equal(engine.pendingAttachmentChecks().length, 0, 'a checked doc must not be offered again');
+});
+
+test('the attachment backfill leaves everything else (e.g. folders) untouched', () => {
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc({ folders: ['Inbox', 'Archive'] })]));
+  const hit = engine.rank('beta').ranked[0];
+  assert.deepEqual([...hit.folders].sort(), ['Archive', 'Inbox']);
+});
+
+test('migration re-serializes a v:3 snapshot as the current format version', () => {
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc()]));
+  assert.equal(engine.toData().v, 4);
+});
+
+test('a v:4 round-trip preserves real attachment data rather than re-defaulting it', () => {
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc()]));
+  engine.upsert(v3Doc({ hasAttachment: true, attachmentNames: ['invoice.pdf'] }));
+  const reloaded = OmniEngine.deserialize(engine.toData());
+  const hit = reloaded.rank('beta').ranked[0];
+  assert.equal(hit.hasAttachment, true);
+  assert.deepEqual(Array.from(hit.attachmentNames), ['invoice.pdf']);
+});
+
+test('a v:3 index does not trip the legacy key repair sweep', () => {
+  // The two migrations are independent: gaining attachment fields is not
+  // evidence of the numeric-key bug, so it must not falsely trigger a deep sweep.
+  const engine = OmniEngine.deserialize(v3Snapshot([v3Doc()]));
+  assert.equal(engine.migratedFromLegacyKey, false);
 });
