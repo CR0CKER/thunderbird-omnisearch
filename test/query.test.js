@@ -317,6 +317,54 @@ test('the full target query parses completely', () => {
 });
 
 // ---------------------------------------------------------------------------
+// hasattachment: / file:
+// ---------------------------------------------------------------------------
+
+test('hasattachment:yes and hasattachment:no set the boolean filter', () => {
+  assert.equal(parse('hasattachment:yes').filters.hasAttachment, true);
+  assert.equal(parse('hasattachment:no').filters.hasAttachment, false);
+});
+
+test('hasattachment accepts true/false/1/0 too', () => {
+  assert.equal(parse('hasattachment:true').filters.hasAttachment, true);
+  assert.equal(parse('hasattachment:1').filters.hasAttachment, true);
+  assert.equal(parse('hasattachment:false').filters.hasAttachment, false);
+  assert.equal(parse('hasattachment:0').filters.hasAttachment, false);
+});
+
+test('an unrecognised hasattachment value is an error, not a silent drop', () => {
+  const r = parse('hasattachment:maybe');
+  assert.equal(r.filters.hasAttachment, null);
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0], /hasattachment/);
+});
+
+test('hasattachment: while typing yields no filter and no error', () => {
+  const r = parse('hasattachment:');
+  assert.equal(r.filters.hasAttachment, null);
+  assert.equal(r.errors.length, 0);
+});
+
+test('file: is extracted, lowercased, and leaves the text clean', () => {
+  const r = parse('report file:Invoice.PDF');
+  assert.equal(r.filters.file, 'invoice.pdf');
+  assert.equal(r.text, 'report');
+});
+
+test('a quoted file value keeps its spaces', () => {
+  const r = parse('file:"annual report.pdf"');
+  assert.equal(r.filters.file, 'annual report.pdf');
+  assert.equal(r.text, '');
+});
+
+test('hasattachment and file both surface as applied chips', () => {
+  const r = parse('hasattachment:yes file:report.pdf');
+  const ops = r.applied.map((a) => a.op);
+  assert.ok(ops.includes('hasattachment'));
+  assert.ok(ops.includes('file'));
+});
+
+// ---------------------------------------------------------------------------
 // hasFilters — the flag the engine uses to pick the wildcard path and to damp
 // the recency boost
 // ---------------------------------------------------------------------------
@@ -326,6 +374,8 @@ test('hasFilters reflects whether any filter is active', () => {
   assert.equal(OmniQuery.hasFilters(parse('date:2024').filters), true);
   assert.equal(OmniQuery.hasFilters(parse('from:alice').filters), true);
   assert.equal(OmniQuery.hasFilters(parse('after:party').filters), false);
+  assert.equal(OmniQuery.hasFilters(parse('hasattachment:yes').filters), true);
+  assert.equal(OmniQuery.hasFilters(parse('file:report.pdf').filters), true);
 });
 
 // ---------------------------------------------------------------------------
