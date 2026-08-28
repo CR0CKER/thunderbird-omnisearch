@@ -490,24 +490,27 @@
       subject.appendChild(badge); // .badge margin-left provides the gap
     }
 
+    const date = document.createElement('span');
+    date.className = 'date';
+    date.textContent = fmtDate(r.date);
+
+    const badges = document.createElement('span');
+    badges.className = 'badges';
+
     // Relevance score badge (percentage of the top-scoring result).
-    const scoreWrap = document.createElement('span');
-    scoreWrap.className = 'date-score';
     if (r._pct != null && sortEl.value !== 'relevance') {
       const scoreEl = document.createElement('span');
       scoreEl.className = 'score';
       scoreEl.title = 'Relevance score';
       scoreEl.textContent = r._pct + '%';
-      scoreWrap.appendChild(scoreEl);
+      badges.appendChild(scoreEl);
     }
-    const date = document.createElement('span');
-    date.className = 'date';
-    date.textContent = fmtDate(r.date);
-    scoreWrap.appendChild(date);
+
+    badges.appendChild(date);
 
     const row = document.createElement('div');
     row.className = 'row';
-    row.append(subject, scoreWrap);
+    row.append(subject, badges);
 
     // A deduplicated result lists every folder the email appears in (e.g. a
     // Gmail message in both Inbox and All Mail). Fall back to the single
