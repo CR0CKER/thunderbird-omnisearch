@@ -20,6 +20,23 @@
         <button id="clear" class="clear" type="button" title="Clear search" hidden>&times;</button>
       </div>
       <div class="actions">
+        <div id="sort-controls" class="sort-controls" hidden>
+          <span class="sort-label">Sort</span>
+          <select id="sort" title="Sort results">
+            <option value="relevance">Relevance</option>
+            <option value="date-desc">Date (newest first)</option>
+            <option value="date-asc">Date (oldest first)</option>
+            <option value="subject">Subject (A–Z)</option>
+            <option value="from">From (A–Z)</option>
+            <option value="to">To (A–Z)</option>
+            <option value="folder">Folder (A–Z)</option>
+          </select>
+        </div>
+        <button id="sort-btn" class="icon-btn" type="button" title="Sort results">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path fill="currentColor" d="M4.668 3.332c.367 0 .664.3.664.668v6.39l1.531-1.527a.663.663 0 0 1 .942 0 .663.663 0 0 1 0 .942l-2.668 2.668a.67.67 0 0 1-.942 0L1.527 9.805a.667.667 0 0 1 .945-.941L4 10.39V4c0-.367.297-.668.668-.668m6.195.195a.67.67 0 0 1 .942 0l2.668 2.668a.667.667 0 0 1-.945.941L12 5.61V12a.667.667 0 1 1-1.332 0V5.61L9.137 7.136a.663.663 0 0 1-.942 0 .663.663 0 0 1 0-.942Zm0 0"/>
+          </svg>
+        </button>
         <button id="settings" class="icon-btn" type="button" title="OmniSearch settings">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path fill="currentColor" d="M15 7h-1.1c-.1-.5-.3-1-.5-1.4l.8-.8c.4-.4.4-1 0-1.4l-.7-.7c-.4-.4-1-.4-1.4 0l-.8.8c-.4-.2-.9-.4-1.4-.5V1c0-.6-.4-1-1-1H7c-.6 0-1 .4-1 1v1.1c-.5.1-1 .3-1.4.5l-.8-.8c-.4-.4-1-.4-1.4 0l-.7.7c-.4.4-.4 1 0 1.4l.8.8c-.2.4-.4.9-.5 1.4H1c-.6 0-1 .4-1 1v1c0 .6.4 1 1 1h1.1c.1.5.3 1 .5 1.4l-.8.8c-.4.4-.4 1 0 1.4l.7.7c.4.4 1 .4 1.4 0l.8-.8c.4.2.9.4 1.4.5V15c0 .6.4 1 1 1h1c.6 0 1-.4 1-1v-1.1c.5-.1 1-.3 1.4-.5l.8.8c.4.4 1 .4 1.4 0l.7-.7c.4-.4.4-1 0-1.4l-.8-.8c.2-.4.4-.9.5-1.4H15c.6 0 1-.4 1-1V8c0-.6-.4-1-1-1zM8 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z"/>

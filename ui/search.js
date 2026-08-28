@@ -12,6 +12,9 @@
   const resultsMetaEl = $('resultsMeta');
   const chipsEl = $('chips');
   const loadingEl = $('loading');
+  const sortEl = $('sort');
+  const sortControls = $('sort-controls');
+  const sortBtn = $('sort-btn');
 
   // Launched as the centered standalone window (background opens
   // ui/search.html#modal) rather than the toolbar-anchored popup. Enables
@@ -491,9 +494,23 @@
     date.className = 'date';
     date.textContent = fmtDate(r.date);
 
+    const badges = document.createElement('span');
+    badges.className = 'badges';
+
+    // Relevance score badge (percentage of the top-scoring result).
+    if (r._pct != null && sortEl.value !== 'relevance') {
+      const scoreEl = document.createElement('span');
+      scoreEl.className = 'score';
+      scoreEl.title = 'Relevance score';
+      scoreEl.textContent = r._pct + '%';
+      badges.appendChild(scoreEl);
+    }
+
+    badges.appendChild(date);
+
     const row = document.createElement('div');
     row.className = 'row';
-    row.append(subject, date);
+    row.append(subject, badges);
 
     // A deduplicated result lists every folder the email appears in (e.g. a
     // Gmail message in both Inbox and All Mail). Fall back to the single
@@ -659,9 +676,10 @@
     if (!ready) return;
     const query = queryInput.value;
     const seq = ++searchSeq;
+    const sort = sortEl.value || null;
     let reply;
     try {
-      reply = await send({ type: 'search', query, limit: PAGE_SIZE, offset: 0 });
+      reply = await send({ type: 'search', query, limit: PAGE_SIZE, offset: 0, sort });
     } catch (e) {
       statusEl.textContent = 'Search backend not responding — reload the add-on (Remove + Load again). ' + (e && e.message ? e.message : '');
       return;
@@ -741,6 +759,18 @@
     syncQueryUi();
     clearResultsView();
     queryInput.focus();
+  });
+
+  sortBtn.addEventListener('click', () => {
+    sortControls.hidden = !sortControls.hidden;
+  });
+
+  sortEl.addEventListener('change', () => {
+    sortControls.hidden = true;
+    // Clear the results (including the sentinel) so the new sort
+    // doesn't append to the old list.
+    clearResultsView();
+    void runSearch();
   });
 
   // Esc clears the field when it has text; when empty, the anchored popup closes
